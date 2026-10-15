@@ -30,37 +30,59 @@ Para que los porteros puedan validar las entradas desde sus teléfonos móviles:
 
 ---
 
-## 🛡️ ¿Cómo funciona la Protección Antifraude?
+## 🔐 Espacios Separados y Autenticación de Acceso
 
-1. **Código Criptográfico Único por Boleto:**
-   - Cada boleto emitido genera un identificador irrepetible (`TKT-XXXX-XXXX`) y un código QR de alta resolución con verificación digital.
-2. **"Quemado" en Primer Uso (Validación en Tiempo Real):**
-   - Cuando la persona llega a la puerta y el portero escanea el QR, la pantalla salta en **VERDE NEÓN** con un sonido armónico de bienvenida.
-   - En ese mismo milisegundo, la base de datos cambia su estado a `INGRESADO` y registra la hora exacta.
-3. **Bloqueo Inmediato de Copias y Capturas (WhatsApp):**
-   - Si esa persona le mandó la captura de pantalla por WhatsApp a un amigo para que intente entrar después, cuando el segundo intente pasar con la misma imagen, la pantalla del portero salta en **ROJO PARPADEANTE** con un sonido de alarma estridente:
+El sistema ahora cuenta con **dos áreas totalmente independientes** para garantizar la seguridad del evento y la privacidad financiera:
+
+1. **🚪 Espacio Portería / Control en Puerta (Acceso con PIN de 4 cifras):**
+   - **PIN por defecto:** `1234` (configurable por el administrador).
+   - Diseñado específicamente para el staff en las puertas desde teléfonos móviles o tablets.
+   - Incluye teclado táctil en pantalla y detector automático de 4 dígitos.
+   - **Lo que ven los porteros:** Escáner de cámara, ingreso manual de código, conteo de personas ingresadas vs aforo, tarjeta gigante de resultado (Verde/Rojo/Amarillo) con sonido de alta intensidad y registro de sus últimos escaneos.
+   - **Lo que NO pueden ver:** Oculta por completo las finanzas, recaudación de dinero, cancelación de boletos, edición del evento y la base de datos de compradores.
+
+2. **👑 Espacio Administrador (Acceso con Contraseña):**
+   - **Contraseña por defecto:** `admin123` (configurable en la pestaña de Ajustes).
+   - Acceso total al Dashboard, métricas de recaudación en dinero, lista completa de asistentes, exportación a Excel, transferencias y anulación de boletos.
+   - Permite cambiar el **PIN de porteros** y la **contraseña de administrador** en cualquier momento.
+   - Incluye botón de acceso rápido para probar o abrir la portería.
+
+---
+
+## ⚡ Boletos Simplificados (Sin Nombre ni Cédula Obligatorios)
+
+- **Ventas Inmediatas en Taquilla:** El nombre y la cédula ya no son requeridos. Si se dejan en blanco, el sistema asigna automáticamente identificadores amigables como `Portador Entrada (General) #5`.
+- **Emisión en Lote / Múltiples Boletos:** Puedes emitir 1, 2, 3, 5 o 10 entradas de un solo clic. Cada una se generará con su propio código QR criptográfico único.
+
+---
+
+## 🛡️ ¿Cómo funciona la Protección Antifraude y contra Capturas de Pantalla?
+
+1. **"Quemado" en Primer Uso (En Tiempo Real):**
+   - En el milisegundo en que un QR es escaneado en puerta, el servidor lo marca como `used`. Si otra persona intenta entrar con una captura de pantalla de ese mismo QR, el sistema salta en **ROJO**:
      > 🛑 **¡ALERTA DE FRAUDE! BOLETO YA UTILIZADO**  
-     > *Este boleto ya ingresó previamente a las 08:15 p.m. por Juan Pérez.*
-4. **Detección de Códigos Falsos:**
-   - Si alguien intenta mostrar un código inventado o de otro evento, la app muestra una advertencia en **AMARILLO**:
-     > ⚠️ **CÓDIGO NO VÁLIDO O FALSIFICADO**
-5. **Transferencias Seguras (Quema y Re-emisión de QR):**
-   - Si un asistente no puede ir y transfiere su boleto a otra persona, el sistema **destruye e invalida permanentemente el código QR viejo** y genera uno nuevo exclusivo para el nuevo comprador.
-   - Si el dueño anterior intenta usar su captura de pantalla vieja en la entrada, la pantalla salta en **ROJO**:
-     > 🛑 **¡ALERTA! BOLETO TRANSFERIDO (CÓDIGO VIEJO)**  
-     > *Este código pertenecía a [Nombre Anterior], pero fue transferido a [Nuevo Titular]. El código viejo quedó invalidado.*
+     > *Este boleto ya fue ingresado previamente a las 08:15 p.m. No se permite reingreso.*
+
+2. **Sello Dinámico de Seguridad en Vivo (Anti-Screenshot):**
+   - El boleto digital oficial cuenta con un **reloj digital en tiempo real con segundero continuo**, un indicador pulsante tipo radar y una **barra holográfica animada**.
+   - Si una persona muestra una foto estática (JPG/PNG), el portero notará inmediatamente que el segundero no avanza y podrá exigir el enlace web original.
+
+3. **Invalidación en Vivo en el Celular del Usuario (SSE):**
+   - Si el asistente tiene su boleto abierto en su teléfono mientras el portero lo escanea, la pantalla de su celular cambia automáticamente en tiempo real a:
+     > 🔴 **YA INGRESADO AL EVENTO (HH:MM)**  
+     > e invalida el código de inmediato.
+
+4. **Transferencias Seguras (Quema de Código Viejo):**
+   - Al transferir un boleto, el QR anterior queda completamente destruido. Si el titular anterior intenta usar su captura de pantalla vieja, el escáner lo detecta como intento de fraude.
 
 ---
 
 ## 📋 Módulos Incluidos en la Aplicación
 
+- **🚪 Control de Acceso Portería:** Vista enfocada 100% en escáner rápido, aforo en vivo y sonidos de alerta.
 - **📊 Dashboard en Tiempo Real:** Métricas de aforo en vivo (% del recinto lleno), boletos emitidos, personas adentro, pendientes, recaudación en dinero y conteo de fraudes bloqueados.
-- **➕ Emisión y Venta de Entradas:** Formulario rápido para registrar ventas con nombre, teléfono, documento, tipo de entrada (General, VIP, Preventa, Cortesía), precio y método de pago.
+- **➕ Emisión Express de Entradas:** Venta en segundos al portador o con datos, con emisión unitaria o en lotes.
 - **🔄 Transferencia Segura de Boletos:** Permite cambiar el titular de un boleto no usado, invalidando el QR anterior y generando uno nuevo para el nuevo comprador.
-- **🎫 Boleto Digital Prémium:**
-  - Diseño estilo pase holográfico para eventos.
-  - Botón de **Compartir por WhatsApp**: Abre un mensaje directo personalizado con el enlace al boleto del cliente.
-  - Botón de **Imprimir / Guardar en PDF** (aislado y limpio, sin fondos oscuros ni cortes).
-- **📷 Portería / Escáner:** Visor de cámara en vivo con mira láser, soporte para cámara trasera de celulares, sonido con Web Audio API y casilla de búsqueda manual por si la pantalla del cliente está rota.
+- **🎫 Boleto Digital Prémium:** Diseño holográfico, reloj en vivo antifraude, botón para compartir por WhatsApp e impresión en PDF limpia.
 - **👥 Lista de Asistentes:** Tabla completa con filtros por estado, buscador interactivo, botones de reingreso, transferencias y exportación directa a **Excel (CSV)**.
-- **⚙️ Configuración del Evento:** Edita el nombre del evento, la fecha, el lugar, el aforo y la moneda en cualquier momento sin perder datos.
+- **⚙️ Configuración del Evento:** Edita nombre, fecha, lugar, aforo, tipos de boleto, PIN de porteros y contraseña admin.

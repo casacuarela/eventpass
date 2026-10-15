@@ -24,6 +24,8 @@ const defaultEvent = {
   location: "Auditorio Principal / Recinto del Evento",
   capacity: 300,
   currency: "$",
+  gatekeeperPin: "1234",
+  adminPassword: "admin123",
   ticketTypes: [
     { id: "general", name: "General", price: 50 },
     { id: "vip", name: "VIP", price: 100 },
@@ -38,7 +40,10 @@ function getEventData() {
     return defaultEvent;
   }
   try {
-    return JSON.parse(fs.readFileSync(EVENT_FILE, 'utf-8'));
+    const data = JSON.parse(fs.readFileSync(EVENT_FILE, 'utf-8'));
+    if (!data.gatekeeperPin) data.gatekeeperPin = "1234";
+    if (!data.adminPassword) data.adminPassword = "admin123";
+    return data;
   } catch (err) {
     return defaultEvent;
   }
@@ -116,6 +121,19 @@ app.post('/api/event', (req, res) => {
     currency: req.body.currency !== undefined ? req.body.currency.trim() : (current.currency || '$')
   };
 
+  // Update PIN if provided (must be 4 digits)
+  if (req.body.gatekeeperPin !== undefined) {
+    const pin = String(req.body.gatekeeperPin).trim();
+    if (/^\d{4}$/.test(pin)) {
+      updated.gatekeeperPin = pin;
+    }
+  }
+
+  // Update admin password if provided (min 4 characters)
+  if (req.body.adminPassword !== undefined && String(req.body.adminPassword).trim().length >= 4) {
+    updated.adminPassword = String(req.body.adminPassword).trim();
+  }
+
   if (Array.isArray(req.body.ticketTypes) && req.body.ticketTypes.length > 0) {
     updated.ticketTypes = req.body.ticketTypes.map((t, idx) => ({
       id: (t.id || t.name || `tipo-${idx + 1}`).toLowerCase().replace(/[^a-z0-9]/gi, '-') || `tipo-${idx + 1}`,
@@ -127,6 +145,31 @@ app.post('/api/event', (req, res) => {
   saveEventData(updated);
   broadcastEvent('EVENT_UPDATED', updated);
   res.json({ success: true, event: updated });
+});
+
+// Authentication APIs
+app.post('/api/auth/gatekeeper', (req, res) => {
+  const { pin } = req.body;
+  const event = getEventData();
+  const currentPin = String(event.gatekeeperPin || '1234').trim();
+
+  if (String(pin).trim() === currentPin) {
+    res.json({ success: true, role: 'gatekeeper', eventName: event.name });
+  } else {
+    res.status(401).json({ success: false, error: "Código PIN incorrecto. Ingrese el código de 4 cifras asignado para portería." });
+  }
+});
+
+app.post('/api/auth/admin', (req, res) => {
+  const { password } = req.body;
+  const event = getEventData();
+  const currentPassword = String(event.adminPassword || 'admin123').trim();
+
+  if (String(password).trim() === currentPassword) {
+    res.json({ success: true, role: 'admin', eventName: event.name });
+  } else {
+    res.status(401).json({ success: false, error: "Contraseña de administrador incorrecta." });
+  }
 });
 
 // Calculate metrics
@@ -168,70 +211,100 @@ app.get('/api/tickets', (req, res) => {
   });
 });
 
-// Create new ticket
+// Create new ticket (Simplified: Name and DNI are optional, supports quantity batch creation!)
 app.post('/api/tickets', async (req, res) => {
   try {
-    const { attendeeName, attendeePhone, attendeeDni, attendeeEmail, type, price, paymentMethod, notes } = req.body;
-
-    if (!attendeeName || !attendeeName.trim()) {
-      return res.status(400).json({ error: "El nombre del asistente es obligatorio." });
-    }
+    const { attendeeName, attendeePhone, attendeeDni, attendeeEmail, type, price, paymentMethod, notes, quantity } = req.body;
 
     const tickets = getTickets();
     const event = getEventData();
+    const count = Math.max(1, Math.min(50, parseInt(quantity, 10) || 1));
 
-    // Unique secure ID: TKT-XXXX-XXXX
-    const randomHex = crypto.randomBytes(4).toString('hex').toUpperCase();
-    const randomHex2 = crypto.randomBytes(2).toString('hex').toUpperCase();
-    const ticketId = `TKT-${randomHex}-${randomHex2}`;
-    
-    // Antifraud secret hash
-    const secretHash = crypto.createHash('sha256').update(`${ticketId}:${Date.now()}:${attendeeName}`).digest('hex').substring(0, 16);
+    // Validar aforo máximo del evento
+    const activeTicketsCount = tickets.filter(t => t.status !== 'cancelled').length;
+    if (event.capacity && (activeTicketsCount + count) > event.capacity) {
+      const remaining = Math.max(0, event.capacity - activeTicketsCount);
+      return res.status(400).json({
+        error: `Aforo máximo superado. Aforo límite: ${event.capacity}. Boletos activos: ${activeTicketsCount}. Cupos disponibles: ${remaining}.`
+      });
+    }
 
-    // QR Payload contains JSON or unique ticket verification code
-    const qrPayload = JSON.stringify({
-      id: ticketId,
-      token: secretHash,
-      event: event.name
-    });
+    const createdTickets = [];
 
-    // Generate crisp QR Data URL (high error correction level 'H' so it scans even if screen is dimmed or scratched)
-    const qrDataUrl = await QRCode.toDataURL(qrPayload, {
-      errorCorrectionLevel: 'H',
-      margin: 2,
-      width: 400,
-      color: {
-        dark: '#0f172a',
-        light: '#ffffff'
+    for (let i = 0; i < count; i++) {
+      // Unique secure ID: TKT-XXXX-XXXX
+      const randomHex = crypto.randomBytes(4).toString('hex').toUpperCase();
+      const randomHex2 = crypto.randomBytes(2).toString('hex').toUpperCase();
+      const ticketId = `TKT-${randomHex}-${randomHex2}`;
+
+      // Final attendee name: default to friendly bearer name if not provided
+      let finalName = '';
+      const ticketTypeLabel = type || 'General';
+      if (attendeeName && attendeeName.trim()) {
+        finalName = count > 1 ? `${attendeeName.trim()} (#${i + 1})` : attendeeName.trim();
+      } else {
+        const nextOrderNum = tickets.length + createdTickets.length + 1;
+        finalName = `Portador Entrada (${ticketTypeLabel}) #${nextOrderNum}`;
       }
-    });
 
-    const newTicket = {
-      id: ticketId,
-      secretToken: secretHash,
-      qrDataUrl,
-      attendeeName: attendeeName.trim(),
-      attendeePhone: attendeePhone ? attendeePhone.trim() : '',
-      attendeeDni: attendeeDni ? attendeeDni.trim() : '',
-      attendeeEmail: attendeeEmail ? attendeeEmail.trim() : '',
-      type: type || 'General',
-      price: Number(price) >= 0 ? Number(price) : 0,
-      paymentMethod: paymentMethod || 'Efectivo',
-      notes: notes ? notes.trim() : '',
-      status: 'valid', // 'valid', 'used', 'cancelled'
-      createdAt: new Date().toISOString(),
-      usedAt: null,
-      scanCount: 0,
-      scanHistory: []
-    };
+      // Antifraud secret hash
+      const secretHash = crypto.createHash('sha256').update(`${ticketId}:${Date.now()}:${i}:${finalName}`).digest('hex').substring(0, 16);
 
-    tickets.unshift(newTicket);
+      // QR Payload contains JSON verification code
+      const qrPayload = JSON.stringify({
+        id: ticketId,
+        token: secretHash,
+        event: event.name
+      });
+
+      // Generate crisp QR Data URL
+      const qrDataUrl = await QRCode.toDataURL(qrPayload, {
+        errorCorrectionLevel: 'H',
+        margin: 2,
+        width: 400,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff'
+        }
+      });
+
+      const newTicket = {
+        id: ticketId,
+        secretToken: secretHash,
+        qrDataUrl,
+        attendeeName: finalName,
+        attendeePhone: attendeePhone ? attendeePhone.trim() : '',
+        attendeeDni: attendeeDni ? attendeeDni.trim() : '',
+        attendeeEmail: attendeeEmail ? attendeeEmail.trim() : '',
+        type: ticketTypeLabel,
+        price: Number(price) >= 0 ? Number(price) : 0,
+        paymentMethod: paymentMethod || 'Efectivo',
+        notes: notes ? notes.trim() : '',
+        status: 'valid', // 'valid', 'used', 'cancelled'
+        createdAt: new Date().toISOString(),
+        usedAt: null,
+        scanCount: 0,
+        scanHistory: []
+      };
+
+      createdTickets.push(newTicket);
+      tickets.unshift(newTicket);
+    }
+
     saveTickets(tickets);
 
     const stats = calculateStats(tickets, event);
-    broadcastEvent('TICKET_CREATED', { ticket: newTicket, stats });
+    createdTickets.forEach(t => {
+      broadcastEvent('TICKET_CREATED', { ticket: t, stats });
+    });
 
-    res.status(201).json({ success: true, ticket: newTicket, stats });
+    res.status(201).json({
+      success: true,
+      ticket: createdTickets[0],
+      tickets: createdTickets,
+      count: createdTickets.length,
+      stats
+    });
   } catch (err) {
     console.error("Error creating ticket:", err);
     res.status(500).json({ error: "Error al generar el boleto." });
