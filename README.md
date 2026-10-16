@@ -32,7 +32,7 @@ Para que los porteros puedan validar las entradas desde sus teléfonos móviles:
 
 ## 🔐 Espacios Separados y Autenticación de Acceso
 
-El sistema ahora cuenta con **dos áreas totalmente independientes** para garantizar la seguridad del evento y la privacidad financiera:
+El sistema cuenta con **tres áreas totalmente independientes** para garantizar la seguridad del evento, agilizar las ventas y proteger la privacidad financiera:
 
 1. **🚪 Espacio Portería / Control en Puerta (Acceso con PIN de 4 cifras):**
    - **PIN por defecto:** `1234` (configurable por el administrador).
@@ -41,11 +41,22 @@ El sistema ahora cuenta con **dos áreas totalmente independientes** para garant
    - **Lo que ven los porteros:** Escáner de cámara, ingreso manual de código, conteo de personas ingresadas vs aforo, tarjeta gigante de resultado (Verde/Rojo/Amarillo) con sonido de alta intensidad y registro de sus últimos escaneos.
    - **Lo que NO pueden ver:** Oculta por completo las finanzas, recaudación de dinero, cancelación de boletos, edición del evento y la base de datos de compradores.
 
-2. **👑 Espacio Administrador (Acceso con Contraseña):**
+2. **🎟️ Espacio Vendedores / Taquilla POS (Acceso con PIN de 4 cifras):**
+   - **PIN por defecto:** `4321` (configurable por el administrador en Ajustes).
+   - Diseñado para promotores, taquilleros y personal de ventas desde sus celulares o computadores.
+   - **Registro de Vendedor:** Permite colocar su nombre o identificación de taquilla (ej. *Taquilla 1*, *Laura Gómez*) para rastrear cada venta.
+   - **Punto de Venta de Alta Velocidad (POS):** Selector táctil de boletos por categoría, cálculo automático de subtotal y venta instantánea "Al Portador" o con datos.
+   - **Calculadora de Cambio:** Al cobrar en efectivo, calcula el cambio/vueltas con botones rápidos (+10, +20, +50, +100, Exacto) para evitar errores.
+   - **Envío Inmediato por WhatsApp:** Un solo clic para enviar el boleto digital oficial con su QR directo al WhatsApp del comprador.
+   - **Impresión Térmica / Ticket:** Genera comprobantes y boletos físicos compatibles con impresoras térmicas (58mm/80mm) y convencionales.
+   - **Corte de Caja del Turno (Mi Caja):** Resumen de dinero físico en mano, pagos digitales, tarjetas y total recaudado con comprobante imprimible de cierre para entrega al organizador.
+   - **Lo que NO pueden ver:** Oculta los ajustes del evento, aforo maestro, contraseñas y base global de boletos.
+
+3. **👑 Espacio Administrador (Acceso con Contraseña):**
    - **Contraseña por defecto:** `admin123` (configurable en la pestaña de Ajustes).
-   - Acceso total al Dashboard, métricas de recaudación en dinero, lista completa de asistentes, exportación a Excel, transferencias y anulación de boletos.
-   - Permite cambiar el **PIN de porteros** y la **contraseña de administrador** en cualquier momento.
-   - Incluye botón de acceso rápido para probar o abrir la portería.
+   - Acceso total al Dashboard, métricas de recaudación en dinero, lista completa de asistentes con trazabilidad de vendedor (*Vendido Por*), exportación a Excel (CSV), transferencias y anulación de boletos.
+   - Permite cambiar el **PIN de porteros**, el **PIN de vendedores** y la **contraseña de administrador** en cualquier momento.
+   - Incluye botones de acceso rápido para probar la portería o el punto de venta.
 
 ---
 

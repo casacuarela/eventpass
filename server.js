@@ -25,6 +25,7 @@ const defaultEvent = {
   capacity: 300,
   currency: "$",
   gatekeeperPin: "1234",
+  sellerPin: "4321",
   adminPassword: "admin123",
   ticketTypes: [
     { id: "general", name: "General", price: 50 },
@@ -42,6 +43,7 @@ function getEventData() {
   try {
     const data = JSON.parse(fs.readFileSync(EVENT_FILE, 'utf-8'));
     if (!data.gatekeeperPin) data.gatekeeperPin = "1234";
+    if (!data.sellerPin) data.sellerPin = "4321";
     if (!data.adminPassword) data.adminPassword = "admin123";
     return data;
   } catch (err) {
@@ -129,6 +131,14 @@ app.post('/api/event', (req, res) => {
     }
   }
 
+  // Update seller PIN if provided (must be 4 digits)
+  if (req.body.sellerPin !== undefined) {
+    const sPin = String(req.body.sellerPin).trim();
+    if (/^\d{4}$/.test(sPin)) {
+      updated.sellerPin = sPin;
+    }
+  }
+
   // Update admin password if provided (min 4 characters)
   if (req.body.adminPassword !== undefined && String(req.body.adminPassword).trim().length >= 4) {
     updated.adminPassword = String(req.body.adminPassword).trim();
@@ -157,6 +167,27 @@ app.post('/api/auth/gatekeeper', (req, res) => {
     res.json({ success: true, role: 'gatekeeper', eventName: event.name });
   } else {
     res.status(401).json({ success: false, error: "Código PIN incorrecto. Ingrese el código de 4 cifras asignado para portería." });
+  }
+});
+
+app.post('/api/auth/seller', (req, res) => {
+  const { pin, sellerName } = req.body;
+  const event = getEventData();
+  const currentPin = String(event.sellerPin || '4321').trim();
+
+  if (String(pin).trim() === currentPin) {
+    const resolvedName = (sellerName && String(sellerName).trim()) ? String(sellerName).trim() : 'Taquilla 1';
+    res.json({
+      success: true,
+      role: 'seller',
+      sellerName: resolvedName,
+      eventName: event.name
+    });
+  } else {
+    res.status(401).json({
+      success: false,
+      error: "PIN de vendedor incorrecto. Ingrese el código de 4 cifras asignado para ventas/taquilla."
+    });
   }
 });
 
@@ -214,7 +245,7 @@ app.get('/api/tickets', (req, res) => {
 // Create new ticket (Simplified: Name and DNI are optional, supports quantity batch creation!)
 app.post('/api/tickets', async (req, res) => {
   try {
-    const { attendeeName, attendeePhone, attendeeDni, attendeeEmail, type, price, paymentMethod, notes, quantity } = req.body;
+    const { attendeeName, attendeePhone, attendeeDni, attendeeEmail, type, price, paymentMethod, notes, quantity, soldBy } = req.body;
 
     const tickets = getTickets();
     const event = getEventData();
@@ -268,6 +299,8 @@ app.post('/api/tickets', async (req, res) => {
         }
       });
 
+      const resolvedSoldBy = (soldBy && String(soldBy).trim()) ? String(soldBy).trim() : 'Administración';
+
       const newTicket = {
         id: ticketId,
         secretToken: secretHash,
@@ -280,6 +313,7 @@ app.post('/api/tickets', async (req, res) => {
         price: Number(price) >= 0 ? Number(price) : 0,
         paymentMethod: paymentMethod || 'Efectivo',
         notes: notes ? notes.trim() : '',
+        soldBy: resolvedSoldBy,
         status: 'valid', // 'valid', 'used', 'cancelled'
         createdAt: new Date().toISOString(),
         usedAt: null,
@@ -663,14 +697,15 @@ app.get('/api/export/csv', (req, res) => {
   const event = getEventData();
 
   let csv = "\uFEFF"; // BOM for Excel UTF-8
-  csv += "Folio Boleto,Nombre Asistente,DNI / Documento,Telefono,Tipo Entrada,Precio,Metodo Pago,Estado,Fecha Emision,Hora Ingreso,Veces Escaneado\n";
+  csv += "Folio Boleto,Nombre Asistente,DNI / Documento,Telefono,Tipo Entrada,Precio,Metodo Pago,Vendido Por,Estado,Fecha Emision,Hora Ingreso,Veces Escaneado\n";
 
   tickets.forEach(t => {
     const estado = t.status === 'valid' ? 'Por Ingresar' : (t.status === 'used' ? 'INGRESADO' : 'Cancelado');
     const precio = t.price || 0;
     const ingreso = t.usedAt ? new Date(t.usedAt).toLocaleString() : 'N/A';
     const emision = new Date(t.createdAt).toLocaleString();
-    csv += `"${t.id}","${t.attendeeName}","${t.attendeeDni || ''}","${t.attendeePhone || ''}","${t.type}",${precio},"${t.paymentMethod}","${estado}","${emision}","${ingreso}",${t.scanCount || 0}\n`;
+    const vendedor = t.soldBy || 'Administración';
+    csv += `"${t.id}","${t.attendeeName}","${t.attendeeDni || ''}","${t.attendeePhone || ''}","${t.type}",${precio},"${t.paymentMethod}","${vendedor}","${estado}","${emision}","${ingreso}",${t.scanCount || 0}\n`;
   });
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
