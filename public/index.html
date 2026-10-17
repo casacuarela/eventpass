@@ -14,77 +14,167 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
   
-  <!-- CSS Principal -->
-  <link rel="stylesheet" href="css/style.css">
+  <!-- CSS Principal (v3.0 Modern Enterprise Layout) -->
+  <link rel="stylesheet" href="css/style.css?v=3.0">
 </head>
 <body>
-  <div class="app-wrapper">
-    <!-- Navbar Superior -->
-    <header class="navbar">
-      <a href="#" class="brand" id="brandLogo">
-        <div class="brand-icon">🎟️</div>
-        <div class="brand-text">
-          <h1>EventPass</h1>
-          <span>Sistema Antifraude en Tiempo Real</span>
-        </div>
-      </a>
+  <!-- Fondo Oscuro para Menú Lateral en Móviles -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-      <!-- Pestañas de Navegación -->
-      <nav class="nav-tabs" role="tablist">
-        <button class="tab-btn active" data-tab="dashboard">
-          <span>📊</span> Dashboard
+  <div class="app-layout">
+    <!-- ================= BARRA LATERAL (SIDEBAR DE ESCRITORIO & CAJÓN MÓVIL) ================= -->
+    <aside class="app-sidebar" id="appSidebar">
+      <!-- Marca / Logotipo -->
+      <div class="sidebar-header">
+        <a href="#" class="brand" id="brandLogo">
+          <div class="brand-icon">🎟️</div>
+          <div class="brand-text">
+            <h1>EventPass</h1>
+            <span>Sistema Antifraude</span>
+          </div>
+        </a>
+        <button class="sidebar-close-btn" id="sidebarCloseBtn" type="button" aria-label="Cerrar navegación lateral">
+          ✕
         </button>
-        <button class="tab-btn" data-tab="sell">
-          <span>➕</span> Emitir Entrada
+      </div>
+
+      <!-- Navegación Vertical por Categorías -->
+      <nav class="sidebar-nav" role="tablist">
+        <div class="sidebar-section-label">PRINCIPAL</div>
+        <button class="tab-btn active" data-tab="dashboard" id="navDashboardBtn">
+          <span class="tab-icon">📊</span>
+          <span class="tab-label">Dashboard</span>
         </button>
+        <button class="tab-btn" data-tab="pos" id="navPosBtn">
+          <span class="tab-icon">🛒</span>
+          <span class="tab-label">Punto de Venta</span>
+        </button>
+        <button class="tab-btn" data-tab="sell" id="navSellBtn">
+          <span class="tab-icon">➕</span>
+          <span class="tab-label">Emitir Entrada</span>
+        </button>
+        <button class="tab-btn" data-tab="attendees" id="navAttendeesBtn">
+          <span class="tab-icon">👥</span>
+          <span class="tab-label">Asistentes</span>
+          <span class="tab-badge" id="tabCount">0</span>
+        </button>
+
+        <div class="sidebar-section-label">OPERACIONES</div>
         <button class="tab-btn" data-tab="scanner" id="navScannerBtn">
-          <span>📷</span> Escáner Portería
+          <span class="tab-icon">📷</span>
+          <span class="tab-label">Escáner Portería</span>
         </button>
-        <button class="tab-btn" data-tab="attendees">
-          <span>👥</span> Asistentes (<span id="tabCount">0</span>)
+        <button class="tab-btn" data-tab="seller-box" id="navSellerBoxBtn" style="display: none;">
+          <span class="tab-icon">💰</span>
+          <span class="tab-label">Mi Caja</span>
         </button>
-        <button class="tab-btn" data-tab="settings">
-          <span>⚙️</span> Evento
+
+        <div class="sidebar-section-label">CONFIGURACIÓN</div>
+        <button class="tab-btn" data-tab="settings" id="navSettingsBtn">
+          <span class="tab-icon">⚙️</span>
+          <span class="tab-label">Evento</span>
         </button>
       </nav>
 
-      <!-- Estado de Sincronización en Vivo -->
-      <div class="nav-actions">
-        <div class="badge badge-used" id="syncStatusBadge" title="Sincronización en vivo activa">
-          <span style="font-size: 8px;">🟢</span> En Línea
+      <!-- Pie de la Barra Lateral -->
+      <div class="sidebar-footer">
+        <div class="sidebar-status-box">
+          <div class="status-pulse-dot"></div>
+          <span class="status-text">Conexión en Tiempo Real</span>
         </div>
       </div>
-    </header>
+    </aside>
 
-    <!-- Contenido Principal -->
-    <main class="container">
-      
-      <!-- ================= PESTAÑA 1: DASHBOARD ================= -->
-      <section id="tab-dashboard" class="tab-content active">
-        <!-- Hero del Evento -->
-        <div class="event-hero">
-          <div class="event-info">
-            <h2 id="heroEventName">Cargando evento...</h2>
-            <div class="event-meta">
-              <span>📅 <strong id="heroEventDate">Por definir</strong></span>
-              <span>📍 <strong id="heroEventLocation">Por definir</strong></span>
-              <span>👥 Aforo Máx: <strong id="heroEventCapacity">0</strong></span>
-            </div>
-          </div>
-          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-            <button class="btn btn-primary" onclick="switchTab('sell')">
-              <span>➕</span> Vender Entrada
-            </button>
-            <button class="btn btn-success" onclick="switchTab('scanner')">
-              <span>📷</span> Abrir Portería
-            </button>
+    <!-- ================= ÁREA DE CONTENIDO PRINCIPAL ================= -->
+    <div class="app-main">
+      <!-- Topbar Compacta y Profesional -->
+      <header class="app-topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-trigger" id="mobileMenuBtn" type="button" aria-label="Abrir Menú">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          
+          <div class="topbar-breadcrumb">
+            <span class="crumb-brand">EventPass</span>
+            <span class="crumb-separator">/</span>
+            <span class="crumb-active" id="topbarCurrentViewTitle">Dashboard</span>
           </div>
         </div>
 
-        <!-- Indicadores Clave (KPIs) -->
-        <div class="kpi-grid">
-          <div class="kpi-card highlight">
-            <div class="kpi-header">
+        <div class="topbar-right">
+          <!-- Indicador de En Línea / Sincronización SSE -->
+          <div class="topbar-sync-badge" id="syncStatusBadge" title="Sincronización en vivo SSE activa">
+            <span class="status-pulse-dot"></span>
+            <span class="topbar-sync-text">En Línea</span>
+          </div>
+
+          <!-- Selector de Modo / Menú de Usuario Compacto -->
+          <div class="user-menu-wrapper">
+            <button class="user-menu-trigger" id="userMenuBtn" type="button" aria-expanded="false" title="Opciones de sesión y cambio de modo">
+              <span id="userRoleIconDisplay">👑</span>
+              <span id="userRoleTextDisplay">Administrador</span>
+              <span class="user-menu-chevron">▾</span>
+            </button>
+
+            <!-- Dropdown Menú Flotante -->
+            <div class="user-dropdown-popover" id="userDropdownMenu">
+              <div class="user-dropdown-header">
+                <span class="user-dropdown-subtitle">Sesión Activa</span>
+                <span class="user-dropdown-role" id="userDropdownRoleTitle">Administrador Principal</span>
+              </div>
+              <div class="user-dropdown-divider"></div>
+              <div class="user-dropdown-actions">
+                <button id="btnSwitchToGatekeeper" class="user-dropdown-btn" type="button">
+                  <span>📷</span> Modo Portería
+                </button>
+                <button id="btnSwitchToSeller" class="user-dropdown-btn" type="button">
+                  <span>🛒</span> Modo Taquilla
+                </button>
+                <div class="user-dropdown-divider"></div>
+                <button id="btnLogout" class="user-dropdown-btn danger" type="button">
+                  <span>🔒</span> Cerrar Sesión
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Elemento de compatibilidad con listeners existentes -->
+          <div id="userRoleBadge" style="display: none;">
+            <span id="userRoleIcon">👑</span>
+            <span id="userRoleText">Administrador</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Contenedor de Vistas -->
+      <main class="container">
+        
+        <!-- ================= PESTAÑA 1: DASHBOARD ================= -->
+        <section id="tab-dashboard" class="tab-content active">
+          <!-- Hero del Evento -->
+          <div class="event-hero">
+            <div class="event-info">
+              <h2 id="heroEventName">Cargando evento...</h2>
+              <div class="event-meta">
+                <span>📅 <strong id="heroEventDate">Por definir</strong></span>
+                <span>📍 <strong id="heroEventLocation">Por definir</strong></span>
+                <span>👥 Aforo: <strong id="heroEventCapacity">0</strong></span>
+              </div>
+            </div>
+            <div class="hero-actions">
+              <button class="btn btn-primary" onclick="switchTab('sell')">
+                <span>➕</span> Vender Entrada
+              </button>
+              <button class="btn btn-success" onclick="switchTab('scanner')">
+                <span>📷</span> Abrir Portería
+              </button>
+            </div>
+          </div>
+
+          <!-- Indicadores Clave (KPIs) -->
+          <div class="kpi-grid">
+            <div class="kpi-card highlight">
+              <div class="kpi-header">
               <span>Ingresados al Evento</span>
               <div class="kpi-icon green">✅</div>
             </div>
@@ -169,20 +259,32 @@
           </div>
 
           <form id="sellTicketForm">
+            <!-- Banner de Emisión Rápida -->
+            <div style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.85rem; color: #c7d2fe; display: flex; align-items: center; gap: 0.65rem;">
+              <span style="font-size: 1.3rem;">⚡</span>
+              <div>
+                <strong>Boleto Simplificado:</strong> No requieres nombre ni cédula obligatorios. Puedes emitir directamente al portador o vender múltiples entradas con un solo clic.
+              </div>
+            </div>
+
             <div class="form-grid">
-              <div class="form-group full-width">
-                <label for="attendeeName">Nombre Completo del Asistente *</label>
-                <input type="text" id="attendeeName" required placeholder="Ej: María Camila Restrepo" autocomplete="name">
+              <div class="form-group">
+                <label for="attendeeName">Nombre del Asistente (Opcional)</label>
+                <input type="text" id="attendeeName" placeholder="Opcional (Ej: Portador Entrada o Nombre)" autocomplete="name">
+                <small style="color: var(--text-muted); font-size: 0.75rem;">Si lo dejas vacío, se asignará 'Al Portador' automáticamente.</small>
               </div>
 
               <div class="form-group">
-                <label for="attendeePhone">WhatsApp / Teléfono</label>
-                <input type="tel" id="attendeePhone" placeholder="Ej: +57 300 123 4567" autocomplete="tel">
-              </div>
-
-              <div class="form-group">
-                <label for="attendeeDni">Documento / Cédula / DNI</label>
-                <input type="text" id="attendeeDni" placeholder="Ej: 1020304050 (opcional para control)">
+                <label for="ticketQuantity">Cantidad de Boletos</label>
+                <select id="ticketQuantity" style="font-weight: 700;">
+                  <option value="1">1 Boleto Único</option>
+                  <option value="2">2 Boletos (Lote)</option>
+                  <option value="3">3 Boletos (Lote)</option>
+                  <option value="4">4 Boletos (Lote)</option>
+                  <option value="5">5 Boletos (Lote)</option>
+                  <option value="10">10 Boletos (Lote)</option>
+                </select>
+                <small style="color: var(--text-muted); font-size: 0.75rem;">Cada entrada tendrá su propio código QR antifraude.</small>
               </div>
 
               <div class="form-group">
@@ -193,7 +295,7 @@
               </div>
 
               <div class="form-group">
-                <label for="ticketPrice">Precio a Cobrar</label>
+                <label for="ticketPrice">Precio a Cobrar (por boleto)</label>
                 <input type="number" id="ticketPrice" min="0" step="any" value="50">
               </div>
 
@@ -208,9 +310,19 @@
                 </select>
               </div>
 
-              <div class="form-group full-width">
+              <div class="form-group">
+                <label for="attendeePhone">WhatsApp / Teléfono (Opcional)</label>
+                <input type="tel" id="attendeePhone" placeholder="Ej: +57 300 123 4567" autocomplete="tel">
+              </div>
+
+              <div class="form-group">
+                <label for="attendeeDni">Documento / Cédula (Opcional)</label>
+                <input type="text" id="attendeeDni" placeholder="Opcional para control">
+              </div>
+
+              <div class="form-group">
                 <label for="ticketNotes">Notas Adicionales (Opcional)</label>
-                <input type="text" id="ticketNotes" placeholder="Ej: Mesa VIP 4, Amigo de producción, etc.">
+                <input type="text" id="ticketNotes" placeholder="Ej: Mesa VIP 4, Cortesía Gerencia, etc.">
               </div>
             </div>
 
@@ -227,78 +339,353 @@
         </div>
       </section>
 
+      <!-- ================= PESTAÑA: PUNTO DE VENTA EXPRESS (POS) ================= -->
+      <section id="tab-pos" class="tab-content">
+        <div class="pos-wrapper">
+          <!-- Barra Superior del POS -->
+          <div class="pos-top-bar">
+            <div class="pos-event-info">
+              <span class="pos-badge">🎟️ Taquilla Express</span>
+              <h2 id="posEventName">Cargando evento...</h2>
+              <div class="pos-seller-pill">
+                <span>👤 Vendedor / Taquilla:</span> <strong id="posCurrentSellerName">Taquilla 1</strong>
+              </div>
+            </div>
+            <div class="pos-stats-pills">
+              <div class="pos-stat-pill">
+                <span>Cupos Disponibles:</span>
+                <strong id="posAvailableSeats">0</strong>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnPosOpenShiftBox" onclick="switchTab('seller-box')">
+                <span>💰</span> Ver Mi Caja
+              </button>
+            </div>
+          </div>
+
+          <div class="pos-layout-grid">
+            <!-- Columna Izquierda: Selector de Entradas -->
+            <div class="pos-catalog-panel">
+              <div class="pos-panel-header">
+                <div>
+                  <h3>1. Selecciona las Entradas</h3>
+                  <span class="pos-panel-subtitle">Haz clic para agregar o quitar boletos de la orden</span>
+                </div>
+              </div>
+              <div class="pos-tickets-grid" id="posTicketTypesGrid">
+                <!-- Se llena dinámicamente con tipos de entrada -->
+              </div>
+            </div>
+
+            <!-- Columna Derecha: Resumen de Orden, Comprador y Cobro con Cambio -->
+            <div class="pos-checkout-panel">
+              <div class="pos-panel-header">
+                <div>
+                  <h3>2. Resumen & Cobro</h3>
+                  <span class="pos-panel-subtitle">Calcula el total, registra cambio y confirma la venta</span>
+                </div>
+                <button type="button" class="btn-text-danger" id="btnPosClearCart" onclick="clearPosCart()">
+                  Vaciar orden
+                </button>
+              </div>
+
+              <!-- Lista de Items en Orden -->
+              <div class="pos-order-items" id="posOrderItemsList">
+                <div class="pos-empty-cart">
+                  <span>🛒</span>
+                  <p>Selecciona una o más entradas a la izquierda para comenzar la venta</p>
+                </div>
+              </div>
+
+              <!-- Selector Rápido: Venta al Portador vs Con Datos -->
+              <div class="pos-buyer-toggle">
+                <label class="pos-toggle-option active" id="togglePosBearer">
+                  <input type="radio" name="posBuyerType" value="bearer" checked onchange="togglePosBuyerFields(false)">
+                  <span>⚡ Al Portador (Rápido)</span>
+                </label>
+                <label class="pos-toggle-option" id="togglePosCustom">
+                  <input type="radio" name="posBuyerType" value="custom" onchange="togglePosBuyerFields(true)">
+                  <span>📝 Con Datos de Asistente</span>
+                </label>
+              </div>
+
+              <!-- Campos Opcionales de Comprador -->
+              <div id="posCustomBuyerFields" style="display: none;" class="pos-buyer-inputs">
+                <div class="form-group">
+                  <label for="posBuyerName">Nombre del Comprador</label>
+                  <input type="text" id="posBuyerName" placeholder="Ej: Carlos Gómez" autocomplete="name">
+                </div>
+                <div class="form-group">
+                  <label for="posBuyerPhone">WhatsApp / Celular (para envío directo)</label>
+                  <input type="tel" id="posBuyerPhone" placeholder="Ej: +57 300 123 4567" autocomplete="tel">
+                </div>
+                <div class="form-group">
+                  <label for="posBuyerDni">Cédula / Documento (Opcional)</label>
+                  <input type="text" id="posBuyerDni" placeholder="Opcional">
+                </div>
+              </div>
+
+              <!-- Métodos de Pago -->
+              <div class="pos-payment-section">
+                <label class="pos-section-label">Método de Pago</label>
+                <div class="pos-payment-chips">
+                  <button type="button" class="payment-chip active" data-method="Efectivo" onclick="selectPosPaymentMethod('Efectivo')">
+                    <span>💵</span> Efectivo
+                  </button>
+                  <button type="button" class="payment-chip" data-method="Nequi / Daviplata / Billetera" onclick="selectPosPaymentMethod('Nequi / Daviplata / Billetera')">
+                    <span>📲</span> Billetera / Nequi
+                  </button>
+                  <button type="button" class="payment-chip" data-method="Transferencia Bancaria" onclick="selectPosPaymentMethod('Transferencia Bancaria')">
+                    <span>🏦</span> Transferencia
+                  </button>
+                  <button type="button" class="payment-chip" data-method="Tarjeta" onclick="selectPosPaymentMethod('Tarjeta')">
+                    <span>💳</span> Tarjeta
+                  </button>
+                  <button type="button" class="payment-chip" data-method="Cortesía" onclick="selectPosPaymentMethod('Cortesía')">
+                    <span>🎁</span> Cortesía
+                  </button>
+                </div>
+              </div>
+
+              <!-- Calculadora de Cambio (Solo en Efectivo) -->
+              <div id="posCashCalculatorBox" class="pos-calculator-box">
+                <div class="calculator-row">
+                  <div style="flex: 1;">
+                    <label for="posCashReceivedInput" style="font-size: 0.82rem; font-weight: 700; color: #bae6fd;">Efectivo Recibido:</label>
+                    <div class="cash-input-wrap">
+                      <span class="currency-prefix" id="posCurrencyPrefix">$</span>
+                      <input type="number" id="posCashReceivedInput" min="0" step="any" placeholder="0" oninput="calculatePosChange()">
+                    </div>
+                  </div>
+                  <div class="change-display-box" id="posChangeBox">
+                    <span class="change-label">Cambio / Vueltas:</span>
+                    <strong class="change-val" id="posChangeAmount">$0</strong>
+                  </div>
+                </div>
+                <div class="quick-cash-chips" id="posQuickCashChips">
+                  <button type="button" class="quick-cash-btn" onclick="setExactCash()">Exacto</button>
+                  <button type="button" class="quick-cash-btn" onclick="addQuickCash(10)">+10</button>
+                  <button type="button" class="quick-cash-btn" onclick="addQuickCash(20)">+20</button>
+                  <button type="button" class="quick-cash-btn" onclick="addQuickCash(50)">+50</button>
+                  <button type="button" class="quick-cash-btn" onclick="addQuickCash(100)">+100</button>
+                </div>
+              </div>
+
+              <!-- Total Grande y Botón de Venta -->
+              <div class="pos-total-row">
+                <div>
+                  <span class="total-label">TOTAL A COBRAR:</span>
+                  <div class="total-amount" id="posGrandTotalDisplay">$0</div>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); text-align: right;">
+                  <span id="posTotalTicketsCount" style="font-weight: 700; color: #fff;">0</span> boletos en orden
+                </div>
+              </div>
+
+              <button type="button" class="btn btn-primary btn-xl" id="btnPosSubmitOrder" onclick="submitPosSale()" style="width: 100%;">
+                <span>🎟️</span> Cobrar y Generar Boletos
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= PESTAÑA: MI CAJA / CORTE DEL TURNO ================= -->
+      <section id="tab-seller-box" class="tab-content">
+        <div class="form-card">
+          <div class="view-card-header">
+            <div>
+              <span class="pos-badge">💰 Cuadre de Caja</span>
+              <h2 class="form-title">Corte de Caja del Turno</h2>
+              <p class="form-subtitle">Resumen de ingresos y boletos emitidos por tu punto de venta en esta sesión.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="switchTab('pos')" type="button">
+                <span>🛒</span> Volver a Ventas
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="printShiftClosingReport()" type="button">
+                <span>🖨️</span> Imprimir Comprobante de Corte
+              </button>
+            </div>
+          </div>
+
+          <!-- Tarjeta de Identificación del Vendedor -->
+          <div class="seller-shift-banner">
+            <div>
+              <span style="font-size: 0.82rem; color: var(--text-muted);">Vendedor / Taquilla:</span>
+              <h3 id="sellerBoxName" style="color: #38bdf8; font-size: 1.25rem;">Taquilla 1</h3>
+            </div>
+            <div>
+              <span style="font-size: 0.82rem; color: var(--text-muted);">Fecha y Hora del Turno:</span>
+              <div id="sellerBoxDateTime" style="font-weight: 600;">-</div>
+            </div>
+            <div>
+              <span style="font-size: 0.82rem; color: var(--text-muted);">Estado del Turno:</span>
+              <div class="badge badge-used" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">🟢 Turno Activo</div>
+            </div>
+          </div>
+
+          <!-- KPIs de la Caja del Vendedor -->
+          <div class="kpi-grid" style="margin-top: 1.25rem;">
+            <div class="kpi-card highlight">
+              <div class="kpi-header">
+                <span>Efectivo en Caja</span>
+                <div class="kpi-icon green">💵</div>
+              </div>
+              <div class="kpi-value" id="sellerKpiCash">$0</div>
+              <div class="kpi-subtext">Dinero físico para entregar</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Digital / Billeteras</span>
+                <div class="kpi-icon indigo">📲</div>
+              </div>
+              <div class="kpi-value" id="sellerKpiDigital">$0</div>
+              <div class="kpi-subtext">Nequi, Daviplata, Transf.</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Tarjetas</span>
+                <div class="kpi-icon purple">💳</div>
+              </div>
+              <div class="kpi-value" id="sellerKpiCard">$0</div>
+              <div class="kpi-subtext">Datáfono / Tarjetas</div>
+            </div>
+
+            <div class="kpi-card highlight" style="border-color: rgba(99, 102, 241, 0.5);">
+              <div class="kpi-header">
+                <span>Gran Total Recaudado</span>
+                <div class="kpi-icon green">💰</div>
+              </div>
+              <div class="kpi-value" id="sellerKpiTotal">$0</div>
+              <div class="kpi-subtext">Venta total del turno</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Boletos Emitidos</span>
+                <div class="kpi-icon yellow">🎟️</div>
+              </div>
+              <div class="kpi-value" id="sellerKpiTickets">0</div>
+              <div class="kpi-subtext">Entradas vendidas</div>
+            </div>
+          </div>
+
+          <!-- Historial de Ventas del Turno -->
+          <div style="margin-top: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+              <h3 style="font-size: 1.1rem; font-weight: 700;">📋 Boletos Vendidos en este Turno</h3>
+              <span id="sellerRecentCount" style="font-size: 0.85rem; color: var(--text-muted);">0 ventas registradas</span>
+            </div>
+
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Folio</th>
+                    <th>Asistente</th>
+                    <th>Tipo</th>
+                    <th>Precio</th>
+                    <th>Método</th>
+                    <th>Hora</th>
+                    <th style="text-align: right;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="sellerTicketsTableBody">
+                  <!-- Se llena dinámicamente -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ================= PESTAÑA 3: ESCÁNER / CONTROL EN PUERTA ================= -->
       <section id="tab-scanner" class="tab-content">
         <div class="scanner-container">
           
-          <!-- Encabezado de Portería con Botón de Cerrar -->
-          <div class="view-card-header" style="width: 100%; margin-bottom: 1.25rem;">
-            <div>
-              <h2 style="font-family: var(--font-heading); font-size: 1.6rem; margin-bottom: 0.25rem;">Control de Acceso Antifraude</h2>
-              <p style="color: var(--text-secondary); font-size: 0.88rem;">Apunta la cámara al código QR del asistente para validar en tiempo real.</p>
+          <!-- Barra Superior HUD de Portería (Zero-Scroll para Móviles) -->
+          <div class="portero-hud-bar">
+            <div class="portero-hud-stat">
+              <span>👥 Adentro:</span>
+              <strong id="porteroCounterText">0 / 300 (0%)</strong>
             </div>
-            <button class="view-close-btn" onclick="switchTab('dashboard')" type="button" title="Cerrar portería y volver al Dashboard">
-              ✕ Cerrar Portería
-            </button>
+            <div class="portero-hud-actions">
+              <button class="hud-btn" id="btnHudSwitchCamera" type="button" title="Girar Cámara (Frontal/Trasera)">
+                <span>🔄</span>
+              </button>
+              <button class="hud-btn" id="btnHudToggleAudio" type="button" title="Silenciar / Activar Sonido">
+                <span id="hudAudioIcon">🔊</span>
+              </button>
+              <button class="hud-btn" id="btnToggleManualDrawer" type="button" title="Validar por Código Manual / Folio">
+                <span>⌨️</span> Folio
+              </button>
+              <button class="hud-btn" id="btnToggleHistoryDrawer" type="button" title="Ver Historial Reciente de Puerta">
+                <span>📋</span>
+              </button>
+              <button class="hud-btn" onclick="switchTab('dashboard')" type="button" id="btnExitScanner" title="Cerrar Portería">
+                <span>✕</span>
+              </button>
+            </div>
           </div>
 
-          <!-- Cuadro de Cámara -->
-          <div class="scanner-box">
+          <!-- Cuadro de Cámara (Ocupa todo el centro sin desbordar la pantalla) -->
+          <div class="scanner-box" id="scannerMainBox">
             <div id="reader"></div>
             <div class="scanner-laser" id="scannerLaser"></div>
-          </div>
 
-          <!-- Controles de Cámara -->
-          <div style="display: flex; gap: 0.75rem; width: 100%; justify-content: center; flex-wrap: wrap;">
-            <button class="btn btn-secondary btn-sm" id="btnToggleCamera">
-              <span>📷</span> Encender / Pausar Cámara
-            </button>
-            <button class="btn btn-secondary btn-sm" id="btnSwitchCamera">
-              <span>🔄</span> Cambiar Cámara (Frontal/Trasera)
-            </button>
-            <button class="btn btn-secondary btn-sm" id="btnToggleAudio">
-              <span id="audioIcon">🔊</span> Sonido Activado
-            </button>
-          </div>
+            <!-- Pantalla HUD Flotante de Resultado (Feedback Instantáneo sobre la Cámara) -->
+            <div id="scanResultCard" class="scan-result-card" onclick="dismissScanResult()">
+              <button type="button" class="scan-result-close-btn" id="btnDismissResultTop" title="Cerrar resultado">✕</button>
+              <div class="result-icon" id="scanResultIcon">✅</div>
+              <div class="result-title" id="scanResultTitle">ACCESO PERMITIDO</div>
+              <div class="result-desc" id="scanResultDesc">Boleto validado correctamente.</div>
 
-          <!-- Pantalla Gigante de Resultado (Feedback Instantáneo) -->
-          <div id="scanResultCard" class="scan-result-card">
-            <button type="button" class="scan-result-close-btn" id="btnDismissResultTop" title="Cerrar resultado" aria-label="Cerrar resultado">✕</button>
-            <div class="result-icon" id="scanResultIcon">✅</div>
-            <div class="result-title" id="scanResultTitle">ACCESO PERMITIDO</div>
-            <div class="result-desc" id="scanResultDesc">Boleto validado correctamente.</div>
+              <div class="result-details-box" id="scanResultDetails">
+                <div><strong>Asistente:</strong> <span id="resName">-</span></div>
+                <div><strong>Tipo:</strong> <span id="resType">-</span></div>
+                <div><strong>Folio:</strong> <span id="resId">-</span></div>
+                <div><strong>Hora:</strong> <span id="resTime">-</span></div>
+              </div>
 
-            <div class="result-details-box" id="scanResultDetails">
-              <div><strong>Asistente:</strong> <span id="resName">-</span></div>
-              <div><strong>Tipo:</strong> <span id="resType">-</span></div>
-              <div><strong>Folio:</strong> <span id="resId">-</span></div>
-              <div><strong>Hora:</strong> <span id="resTime">-</span></div>
+              <div style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.7); text-align: center; margin-top: 0.25rem;">
+                Toca la pantalla para continuar de inmediato
+              </div>
             </div>
-
-            <button class="btn btn-secondary" id="btnDismissResult" style="width: 100%; font-weight: 600; margin-top: 0.5rem; padding: 0.75rem;">
-              <span>✕</span> Continuar Escaneando (Cerrar)
-            </button>
           </div>
 
-          <!-- Entrada Manual por Teclado / Búsqueda rápida -->
-          <div class="manual-input-box">
-            <label for="manualTicketCode">Validación Manual (Si la cámara o pantalla no responde):</label>
+          <!-- Gaveta Desplegable: Entrada Manual por Teclado -->
+          <div class="drawer-sheet" id="drawerManualInput" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <label for="manualTicketCode" style="font-weight: 700; font-size: 0.85rem; color: #a5b4fc;">
+                ⌨️ Validación Manual de Folio
+              </label>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="toggleManualDrawer(false)" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                ✕ Ocultar
+              </button>
+            </div>
             <form id="manualScanForm" class="manual-search-row">
-              <input type="text" id="manualTicketCode" placeholder="Ej: TKT-1234-ABCD o Cédula" autocomplete="off">
-              <button type="submit" class="btn btn-primary">
+              <input type="text" id="manualTicketCode" placeholder="Ej: TKT-A1B2-C3D4 o Cédula" autocomplete="off" style="flex: 1;">
+              <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.25rem;">
                 <span>Validar</span>
               </button>
             </form>
           </div>
 
-          <!-- Historial Reciente de Puerta -->
-          <div style="width: 100%;">
-            <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">
-              Últimos Escaneos en Puerta
-            </h3>
+          <!-- Gaveta Desplegable: Historial Reciente de Puerta -->
+          <div class="drawer-sheet" id="drawerHistory" style="display: none; max-height: 220px; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <h3 style="font-size: 0.88rem; font-weight: 700; color: var(--text-secondary); margin: 0;">
+                📋 Últimos Escaneos en Puerta
+              </h3>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="toggleHistoryDrawer(false)" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                ✕ Ocultar
+              </button>
+            </div>
             <div id="recentScansList" style="display: flex; flex-direction: column; gap: 0.4rem;">
               <!-- Se llena dinámicamente -->
-              <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 1rem;">
+              <div style="font-size: 0.82rem; color: var(--text-muted); text-align: center; padding: 0.75rem;">
                 Aún no hay escaneos en esta sesión.
               </div>
             </div>
@@ -332,6 +719,10 @@
                 <option value="used">✅ Ingresados</option>
                 <option value="cancelled">🛑 Cancelados</option>
               </select>
+
+              <select id="filterSellerSelect" style="width: auto;">
+                <option value="all">Todos los vendedores</option>
+              </select>
             </div>
           </div>
 
@@ -344,6 +735,7 @@
                   <th>Tipo</th>
                   <th>Precio</th>
                   <th>Pago</th>
+                  <th>Vendido Por</th>
                   <th>Estado</th>
                   <th>Hora Ingreso</th>
                   <th style="text-align: right;">Acciones</th>
@@ -421,6 +813,35 @@
               </div>
             </div>
 
+            <!-- Configuración de Seguridad y Accesos Separados -->
+            <div class="ticket-types-manager" style="margin-top: 1.5rem;">
+              <div class="ticket-types-header">
+                <div>
+                  <h3 class="ticket-types-title">🔐 Seguridad y Accesos Separados</h3>
+                  <p class="ticket-types-desc">Define el PIN para el personal de puerta y la contraseña maestra de administración.</p>
+                </div>
+              </div>
+              <div class="form-grid" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.4); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <div class="form-group">
+                  <label for="setGatekeeperPin">🚪 PIN de Portería (4 cifras numéricas)</label>
+                  <input type="text" id="setGatekeeperPin" maxlength="4" pattern="\d{4}" placeholder="Ej: 1234" value="1234" style="font-family: monospace; font-size: 1.15rem; letter-spacing: 3px; max-width: 140px; font-weight: 700; color: #34d399;">
+                  <small style="color: var(--text-muted); font-size: 0.78rem;">Código rápido para que los porteros entren al escáner sin ver finanzas.</small>
+                </div>
+
+                <div class="form-group">
+                  <label for="setSellerPin">🎟️ PIN de Ventas / Taquilla (4 cifras numéricas)</label>
+                  <input type="text" id="setSellerPin" maxlength="4" pattern="\d{4}" placeholder="Ej: 4321" value="4321" style="font-family: monospace; font-size: 1.15rem; letter-spacing: 3px; max-width: 140px; font-weight: 700; color: #38bdf8;">
+                  <small style="color: var(--text-muted); font-size: 0.78rem;">Código rápido para que los vendedores entren a su Punto de Venta sin ver ajustes ni contraseñas.</small>
+                </div>
+
+                <div class="form-group">
+                  <label for="setAdminPassword">👑 Contraseña de Administrador</label>
+                  <input type="password" id="setAdminPassword" placeholder="Dejar en blanco para no cambiarla" autocomplete="new-password">
+                  <small style="color: var(--text-muted); font-size: 0.78rem;">Mínimo 4 caracteres. Protege finanzas, emisión y cambios.</small>
+                </div>
+              </div>
+            </div>
+
             <!-- Botones de Acción: Cerrar y Guardar -->
             <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap;">
               <button type="button" class="btn btn-secondary btn-lg" onclick="switchTab('dashboard')" style="flex: 1; font-weight: 700;">
@@ -435,7 +856,32 @@
       </section>
 
     </main>
-  </div>
+
+    <!-- Barra de Navegación Inferior Ultracompacta para Móviles -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav">
+      <button class="mobile-nav-btn tab-btn active" data-tab="dashboard">
+        <span class="mob-icon">📊</span>
+        <span class="mob-label">Panel</span>
+      </button>
+      <button class="mobile-nav-btn tab-btn" data-tab="pos">
+        <span class="mob-icon">🛒</span>
+        <span class="mob-label">POS</span>
+      </button>
+      <button class="mobile-nav-btn tab-btn" data-tab="scanner">
+        <span class="mob-icon">📷</span>
+        <span class="mob-label">Escanear</span>
+      </button>
+      <button class="mobile-nav-btn tab-btn" data-tab="attendees">
+        <span class="mob-icon">👥</span>
+        <span class="mob-label">Asistentes</span>
+      </button>
+      <button class="mobile-nav-btn" id="mobileNavMoreBtn" type="button">
+        <span class="mob-icon">☰</span>
+        <span class="mob-label">Menú</span>
+      </button>
+    </nav>
+  </div> <!-- /.app-main -->
+</div> <!-- /.app-layout -->
 
   <!-- ================= MODAL DE BOLETO DIGITAL ================= -->
   <div class="modal-backdrop" id="ticketModal" role="dialog" aria-modal="true" aria-labelledby="modalEventName">
@@ -635,10 +1081,331 @@
     </div>
   </div>
 
+  <!-- ================= MODAL DE ACCESO Y AUTENTICACIÓN (PORTERO O ADMIN) ================= -->
+  <div class="auth-overlay" id="authOverlay" style="display: none;">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">🎟️</div>
+        <h2>EventPass</h2>
+        <p>Sistema Profesional de Gestión y Control de Acceso</p>
+      </div>
+
+      <!-- Selector de Rol / Espacio -->
+      <div class="auth-role-tabs">
+        <button type="button" class="auth-role-tab active" id="tabRoleGatekeeper" onclick="selectAuthRole('gatekeeper')">
+          <span>🚪</span>
+          <div>
+            <strong>Portería / Control</strong>
+            <small>Validar con PIN</small>
+          </div>
+        </button>
+        <button type="button" class="auth-role-tab" id="tabRoleSeller" onclick="selectAuthRole('seller')">
+          <span>🎟️</span>
+          <div>
+            <strong>Ventas / Taquilla</strong>
+            <small>Punto de Venta POS</small>
+          </div>
+        </button>
+        <button type="button" class="auth-role-tab" id="tabRoleAdmin" onclick="selectAuthRole('admin')">
+          <span>👑</span>
+          <div>
+            <strong>Administrador</strong>
+            <small>Control total</small>
+          </div>
+        </button>
+      </div>
+
+      <!-- Formulario Portero (PIN 4 cifras) -->
+      <form id="formGatekeeperAuth" class="auth-form active">
+        <div class="auth-description-banner">
+          <span>⚡</span> <span>Acceso rápido y exclusivo para escanear en puertas. Sin acceso a finanzas ni cambios del evento.</span>
+        </div>
+
+        <div class="form-group" style="text-align: center;">
+          <label for="gatekeeperPinInput" style="font-size: 0.88rem; font-weight: 700; color: #a5b4fc;">
+            Ingresa el PIN de Portería (4 cifras)
+          </label>
+          <div class="pin-input-container">
+            <input type="password" id="gatekeeperPinInput" maxlength="4" pattern="\d{4}" inputmode="numeric" placeholder="• • • •" autocomplete="one-time-code" autofocus>
+          </div>
+          <div class="auth-error-msg" id="gatekeeperErrorMsg"></div>
+        </div>
+
+        <!-- Teclado numérico táctil para móviles -->
+        <div class="pin-numpad">
+          <button type="button" class="num-btn" onclick="appendPinDigit('1')">1</button>
+          <button type="button" class="num-btn" onclick="appendPinDigit('2')">2</button>
+          <button type="button" class="num-btn" onclick="appendPinDigit('3')">3</button>
+          <button type="button" class="num-btn" onclick="appendPinDigit('4')">4</button>
+          <button type="button" class="num-btn" onclick="appendPinDigit('5')">5</button>
+          <button type="button" class="num-btn" onclick="appendPinDigit('6')">6</button>
+          <button type="button" class="num-btn" onclick="appendPinDigit('7')">7</button>
+          <button type="button" class="num-btn" onclick="appendPinDigit('8')">8</button>
+          <button type="button" class="num-btn" onclick="appendPinDigit('9')">9</button>
+          <button type="button" class="num-btn action" onclick="clearPinDigits()">C</button>
+          <button type="button" class="num-btn" onclick="appendPinDigit('0')">0</button>
+          <button type="button" class="num-btn action" onclick="deletePinDigit()">⌫</button>
+        </div>
+
+        <button type="submit" class="btn btn-success btn-lg" style="width: 100%; margin-top: 1rem; font-weight: 700;">
+          <span>📷</span> Abrir Escáner de Portería
+        </button>
+
+        <div style="text-align: center; margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
+          PIN por defecto: <code style="color: #34d399; font-weight: 700;">1234</code>
+        </div>
+      </form>
+
+      <!-- Formulario Vendedor / Taquilla (PIN 4 cifras + Nombre) -->
+      <form id="formSellerAuth" class="auth-form" style="display: none;">
+        <div class="auth-description-banner" style="background: rgba(14, 165, 233, 0.12); border-color: rgba(14, 165, 233, 0.35); color: #bae6fd;">
+          <span>⚡</span> <span>Espacio exclusivo para vendedores. Emisión express, cobro con cambio, WhatsApp, recibos y corte de turno.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="sellerNameInput" style="font-size: 0.88rem; font-weight: 700; color: #bae6fd;">
+            Nombre del Vendedor / Identificador de Taquilla
+          </label>
+          <input type="text" id="sellerNameInput" placeholder="Ej: Taquilla 1 o Tu Nombre" value="Taquilla 1" autocomplete="name" style="text-align: center; font-weight: 600;">
+          <small style="color: var(--text-muted); font-size: 0.75rem;">Aparecerá en los boletos vendidos y en tu comprobante de corte de caja.</small>
+        </div>
+
+        <div class="form-group" style="text-align: center; margin-top: 0.5rem;">
+          <label for="sellerPinInput" style="font-size: 0.88rem; font-weight: 700; color: #a5b4fc;">
+            Ingresa el PIN de Ventas (4 cifras)
+          </label>
+          <div class="pin-input-container">
+            <input type="password" id="sellerPinInput" maxlength="4" pattern="\d{4}" inputmode="numeric" placeholder="• • • •" autocomplete="one-time-code">
+          </div>
+          <div class="auth-error-msg" id="sellerErrorMsg"></div>
+        </div>
+
+        <!-- Teclado numérico táctil para móviles -->
+        <div class="pin-numpad">
+          <button type="button" class="num-btn" onclick="appendSellerPinDigit('1')">1</button>
+          <button type="button" class="num-btn" onclick="appendSellerPinDigit('2')">2</button>
+          <button type="button" class="num-btn" onclick="appendSellerPinDigit('3')">3</button>
+          <button type="button" class="num-btn" onclick="appendSellerPinDigit('4')">4</button>
+          <button type="button" class="num-btn" onclick="appendSellerPinDigit('5')">5</button>
+          <button type="button" class="num-btn" onclick="appendSellerPinDigit('6')">6</button>
+          <button type="button" class="num-btn" onclick="appendSellerPinDigit('7')">7</button>
+          <button type="button" class="num-btn" onclick="appendSellerPinDigit('8')">8</button>
+          <button type="button" class="num-btn" onclick="appendSellerPinDigit('9')">9</button>
+          <button type="button" class="num-btn action" onclick="clearSellerPinDigits()">C</button>
+          <button type="button" class="num-btn" onclick="appendSellerPinDigit('0')">0</button>
+          <button type="button" class="num-btn action" onclick="deleteSellerPinDigit()">⌫</button>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 1rem; font-weight: 700; background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);">
+          <span>🛒</span> Abrir Punto de Venta
+        </button>
+
+        <div style="text-align: center; margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
+          PIN por defecto: <code style="color: #38bdf8; font-weight: 700;">4321</code>
+        </div>
+      </form>
+
+      <!-- Formulario Administrador (Contraseña) -->
+      <form id="formAdminAuth" class="auth-form" style="display: none;">
+        <div class="auth-description-banner">
+          <span>👑</span> <span>Control total: métricas financieras, emisión de boletos, administración de asistentes y seguridad.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="adminPasswordInput" style="font-size: 0.88rem; font-weight: 700; color: #c7d2fe;">
+            Contraseña de Administrador
+          </label>
+          <input type="password" id="adminPasswordInput" placeholder="Ingresa tu contraseña" autocomplete="current-password">
+          <div class="auth-error-msg" id="adminErrorMsg"></div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 1rem; font-weight: 700;">
+          <span>🔓</span> Entrar al Panel de Control
+        </button>
+        
+        <div style="text-align: center; margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
+          Contraseña inicial por defecto: <code style="color: #38bdf8;">admin123</code> (puedes cambiarla en ajustes)
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL DE VENTA EXITOSA DEL POS ================= -->
+  <div class="modal-backdrop" id="posSuccessModal" role="dialog" aria-modal="true" aria-labelledby="posSuccessTitle">
+    <div class="modal-content" style="max-width: 520px; text-align: center;">
+      <div class="modal-top-bar" style="justify-content: flex-end;">
+        <button class="modal-close-pill-btn" onclick="closePosSuccessModal()" type="button" title="Cerrar y continuar">
+          ✕ Cerrar
+        </button>
+      </div>
+
+      <div style="font-size: 3rem; margin-bottom: 0.35rem; animation: pulseGlow 1.5s infinite;">🎉</div>
+      <h2 id="posSuccessTitle" style="font-family: var(--font-heading); font-size: 1.5rem; color: #34d399; margin-bottom: 0.25rem;">
+        ¡Venta Registrada con Éxito!
+      </h2>
+      <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.25rem;">
+        Boleto(s) emitido(s) y protegido(s) con código QR criptográfico único.
+      </p>
+
+      <!-- Resumen visual de la venta -->
+      <div class="pos-success-summary-box">
+        <div class="summary-line">
+          <span>Boletos generados:</span>
+          <strong id="posSuccessCountText">1 Entrada</strong>
+        </div>
+        <div class="summary-line">
+          <span>Titular / Asistente:</span>
+          <strong id="posSuccessAttendeeName">Al Portador</strong>
+        </div>
+        <div class="summary-line highlight">
+          <span>Total Cobrado:</span>
+          <strong id="posSuccessTotalPaid">$0</strong>
+        </div>
+        <div class="summary-line" id="posSuccessChangeRow" style="display: none; color: #34d399;">
+          <span>Cambio entregado:</span>
+          <strong id="posSuccessChangeText">$0</strong>
+        </div>
+        <div class="summary-line" style="font-family: monospace; font-size: 0.8rem; color: #38bdf8;">
+          <span>Folio principal:</span>
+          <strong id="posSuccessFolio">TKT-XXXX-XXXX</strong>
+        </div>
+      </div>
+
+      <!-- Envío Directo por WhatsApp -->
+      <div class="pos-whatsapp-action-box">
+        <div style="display: flex; align-items: center; gap: 0.5rem; justify-content: center; margin-bottom: 0.5rem;">
+          <span style="font-size: 1.3rem;">📲</span>
+          <strong style="color: #25d366; font-size: 0.95rem;">Enviar Boleto por WhatsApp al Comprador</strong>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <input type="tel" id="posSuccessPhoneInput" placeholder="Número Celular (Ej: +57 300 123 4567)" style="flex: 1; text-align: center; font-weight: 600;">
+          <button type="button" class="btn btn-success" id="btnPosSendWhatsApp" onclick="sendPosTicketWhatsApp()">
+            <span>📲</span> Enviar WhatsApp
+          </button>
+        </div>
+        <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.35rem; display: block;">
+          Abre un chat con el enlace directo al boleto digital para que el cliente lo guarde en su celular.
+        </small>
+      </div>
+
+      <!-- Botones de Impresión y Acciones -->
+      <div style="display: flex; gap: 0.6rem; margin-top: 1rem;">
+        <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="printPosThermalReceipt()">
+          <span>🖨️</span> Imprimir Recibo / Ticket
+        </button>
+        <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="copyPosTicketLink()">
+          <span>🔗</span> Copiar Enlace
+        </button>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-lg" onclick="closePosSuccessModal()" style="width: 100%; margin-top: 1rem; font-weight: 700; font-size: 1.05rem;">
+        <span>⚡</span> Siguiente Venta (Continuar)
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= PLANTILLA DE IMPRESIÓN: RECIBO TÉRMICO / TICKET FÍSICO ================= -->
+  <div id="printableThermalReceipt" class="printable-thermal-wrap" style="display: none;">
+    <div class="thermal-receipt">
+      <div class="thermal-header">
+        <h2 id="receiptEventName">Mi Gran Evento 2026</h2>
+        <div id="receiptEventSubtitle">Acceso Exclusivo</div>
+        <div class="thermal-divider-dashed"></div>
+        <div class="receipt-meta-line">📅 <span id="receiptDate">Fecha</span></div>
+        <div class="receipt-meta-line">📍 <span id="receiptLocation">Lugar</span></div>
+      </div>
+
+      <div class="thermal-divider-dashed"></div>
+
+      <div class="thermal-qr-box">
+        <img id="receiptQrImage" src="" alt="QR Acceso">
+        <div class="receipt-folio" id="receiptFolio">TKT-XXXX-XXXX</div>
+        <div class="receipt-ticket-type" id="receiptTicketType">ENTRADA GENERAL</div>
+      </div>
+
+      <div class="thermal-divider-dashed"></div>
+
+      <div class="thermal-details">
+        <div class="thermal-line">
+          <span>Asistente:</span>
+          <strong id="receiptAttendee">Portador</strong>
+        </div>
+        <div class="thermal-line" id="receiptDniRow" style="display: none;">
+          <span>Documento:</span>
+          <strong id="receiptDni">-</strong>
+        </div>
+        <div class="thermal-line">
+          <span>Precio:</span>
+          <strong id="receiptPrice">$0</strong>
+        </div>
+        <div class="thermal-line">
+          <span>Método de Pago:</span>
+          <strong id="receiptPayment">Efectivo</strong>
+        </div>
+        <div class="thermal-line">
+          <span>Vendido por:</span>
+          <strong id="receiptSeller">Taquilla 1</strong>
+        </div>
+        <div class="thermal-line">
+          <span>Fecha/Hora Emisión:</span>
+          <strong id="receiptTime">-</strong>
+        </div>
+      </div>
+
+      <div class="thermal-divider-dashed"></div>
+
+      <div class="thermal-footer">
+        <div>🔒 CÓDIGO CRIPTOGRÁFICO ÚNICO</div>
+        <div>Válido para 1 solo ingreso. No comparta fotos.</div>
+        <div style="margin-top: 4px; font-weight: bold;">¡Gracias por tu compra!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PLANTILLA DE IMPRESIÓN: CORTE DE CAJA DEL TURNO ================= -->
+  <div id="printableShiftClosing" class="printable-thermal-wrap" style="display: none;">
+    <div class="thermal-receipt shift-receipt">
+      <div class="thermal-header">
+        <h2>COMPROBANTE DE CORTE DE CAJA</h2>
+        <div id="shiftReceiptEvent">Mi Gran Evento 2026</div>
+        <div class="thermal-divider-dashed"></div>
+      </div>
+
+      <div class="thermal-details">
+        <div class="thermal-line"><span>Vendedor / Taquilla:</span> <strong id="shiftReceiptSeller">-</strong></div>
+        <div class="thermal-line"><span>Fecha y Hora Corte:</span> <strong id="shiftReceiptDate">-</strong></div>
+        <div class="thermal-line"><span>Boletos Vendidos:</span> <strong id="shiftReceiptCount">0</strong></div>
+      </div>
+
+      <div class="thermal-divider-dashed"></div>
+
+      <div class="thermal-details">
+        <div class="thermal-line"><span>💵 Efectivo en Mano:</span> <strong id="shiftReceiptCash">$0</strong></div>
+        <div class="thermal-line"><span>📲 Billeteras / Nequi:</span> <strong id="shiftReceiptDigital">$0</strong></div>
+        <div class="thermal-line"><span>💳 Tarjetas:</span> <strong id="shiftReceiptCard">$0</strong></div>
+        <div class="thermal-divider-dashed"></div>
+        <div class="thermal-line total-line"><span>💰 GRAN TOTAL RECAUDADO:</span> <strong id="shiftReceiptTotal">$0</strong></div>
+      </div>
+
+      <div class="thermal-divider-dashed"></div>
+
+      <div class="shift-signatures">
+        <div class="signature-box">
+          <div class="sig-line"></div>
+          <div>Firma Vendedor / Entrega</div>
+        </div>
+        <div class="signature-box">
+          <div class="sig-line"></div>
+          <div>Firma Admin / Recibe</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Librería de Escaneo QR -->
   <script src="vendor/html5-qrcode.min.js"></script>
 
-  <!-- Lógica Principal -->
-  <script src="js/app.js"></script>
+  <!-- Lógica Principal (v3.0 Modern Enterprise Layout) -->
+  <script src="js/app.js?v=3.0"></script>
 </body>
 </html>

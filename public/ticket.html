@@ -30,7 +30,7 @@
       text-align: center;
       font-weight: 700;
       font-size: 0.95rem;
-      margin-bottom: 1.25rem;
+      margin-bottom: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       display: flex;
@@ -49,6 +49,78 @@
       border: 1px solid #ef4444;
       color: #f87171;
     }
+    
+    /* Live Dynamic Anti-Screenshot Security Strip */
+    .live-security-strip {
+      background: linear-gradient(90deg, rgba(16, 185, 129, 0.12) 0%, rgba(6, 182, 212, 0.18) 50%, rgba(16, 185, 129, 0.12) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: var(--radius-md);
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 18px rgba(16, 185, 129, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+    .live-clock-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-family: monospace;
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #34d399;
+      letter-spacing: 1px;
+    }
+    .pulse-dot {
+      width: 10px;
+      height: 10px;
+      background-color: #10b981;
+      border-radius: 50%;
+      position: relative;
+    }
+    .pulse-dot::after {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #10b981;
+      animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.5); opacity: 1; }
+      80%, 100% { transform: scale(1.6); opacity: 0; }
+    }
+    .live-security-tag {
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #a7f3d0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .live-hologram-shimmer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      width: 100%;
+      background: linear-gradient(90deg, #10b981, #06b6d4, #a855f7, #f59e0b, #10b981);
+      background-size: 300% 100%;
+      animation: shimmerFlow 2.5s linear infinite;
+    }
+    @keyframes shimmerFlow {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 100% 50%; }
+    }
+
     .instructions-card {
       background: rgba(15, 23, 42, 0.6);
       border: 1px solid var(--border-color);
@@ -90,6 +162,19 @@
         <span>🟢</span> <span id="statusBannerText">VÁLIDO PARA INGRESAR</span>
       </div>
 
+      <!-- Sello Dinámico Antifraude con Reloj en Vivo -->
+      <div class="live-security-strip" id="liveSecurityStrip">
+        <div class="live-clock-badge">
+          <div class="pulse-dot"></div>
+          <span id="liveClockText">--:--:--</span>
+        </div>
+        <div class="live-security-tag">
+          <span style="color: #6ee7b7;">🛡️ EN VIVO OFICIAL</span>
+          <span style="font-size: 0.62rem; color: var(--text-muted);">Verificado en portería</span>
+        </div>
+        <div class="live-hologram-shimmer"></div>
+      </div>
+
       <!-- Tarjeta del Boleto -->
       <div class="digital-ticket-card" id="printableTicketCard">
         <div class="ticket-hologram"></div>
@@ -101,16 +186,16 @@
           </div>
 
           <div class="ticket-grid-details">
-            <div class="ticket-detail-item">
+            <div class="ticket-detail-item" id="attendeeContainer">
               <div class="label">Asistente</div>
-              <div class="value" id="attendeeName">-</div>
+              <div class="value" id="attendeeName">Al Portador</div>
             </div>
-            <div class="ticket-detail-item">
+            <div class="ticket-detail-item" id="dniContainer">
               <div class="label">Documento</div>
-              <div class="value" id="attendeeDni">-</div>
+              <div class="value" id="attendeeDni">Al Portador</div>
             </div>
             <div class="ticket-detail-item">
-              <div class="label">Folio</div>
+              <div class="label">Folio Único</div>
               <div class="value" style="font-family: monospace; color: #38bdf8;" id="ticketId">-</div>
             </div>
             <div class="ticket-detail-item">
@@ -131,13 +216,13 @@
         </div>
       </div>
 
-      <!-- Recomendaciones de Acceso -->
+      <!-- Recomendaciones de Acceso & Antifraude -->
       <div class="instructions-card">
         <h4>📋 Indicaciones para el ingreso:</h4>
-        <ul style="padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.35rem;">
+        <ul style="padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.45rem;">
           <li>Asegúrate de tener buen brillo en la pantalla al momento de escanear.</li>
-          <li>Puedes tomar una captura de pantalla clara por si no tienes datos móviles en el recinto.</li>
-          <li><strong>Importante:</strong> Este código es de uso único. Si lo compartes con otra persona, quien lo escanee primero ingresará y el boleto se invalidará de inmediato.</li>
+          <li><strong>🛡️ Protección Antifraude:</strong> El personal de portería verificará que el segundero en vivo esté corriendo. Las capturas de pantalla fijas pueden ser rechazadas si el código ya fue escaneado antes.</li>
+          <li><strong>Uso Único:</strong> Cada QR permite un solo ingreso. Una vez escaneado en puerta, se invalida de inmediato para cualquier otra persona.</li>
         </ul>
       </div>
 
@@ -152,9 +237,61 @@
   </div>
 
   <script>
+    let currentTicketId = null;
+
+    // Reloj dinámico de verificación en vivo para neutralizar capturas de pantalla fijas
+    function startLiveSecurityClock() {
+      const clockEl = document.getElementById('liveClockText');
+      function update() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        if (clockEl) {
+          clockEl.textContent = `${hours}:${minutes}:${seconds}`;
+        }
+      }
+      update();
+      setInterval(update, 500);
+    }
+
+    // Escuchar SSE en tiempo real: Si se escanea en la puerta, el celular se actualiza al instante
+    function setupTicketSSE(ticketId) {
+      try {
+        const eventSource = new EventSource('/api/events/stream');
+        eventSource.onmessage = (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            if ((payload.type === 'TICKET_SCANNED' || payload.type === 'FRAUD_DETECTED') && payload.data && payload.data.ticket) {
+              if (payload.data.ticket.id === ticketId) {
+                markTicketAsUsed(payload.data.ticket);
+              }
+            }
+          } catch (err) {}
+        };
+      } catch (err) {}
+    }
+
+    function markTicketAsUsed(ticket) {
+      const banner = document.getElementById('statusBanner');
+      const timeStr = ticket.usedAt ? new Date(ticket.usedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      banner.className = 'ticket-status-banner used';
+      banner.innerHTML = `<span>🔴</span> YA INGRESADO AL EVENTO ${timeStr ? '(' + timeStr + ')' : ''}`;
+      
+      const strip = document.getElementById('liveSecurityStrip');
+      if (strip) {
+        strip.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        strip.style.background = 'rgba(239, 68, 68, 0.15)';
+        const tag = strip.querySelector('.live-security-tag');
+        if (tag) tag.innerHTML = '<span style="color: #f87171;">⛔ YA UTILIZADO</span>';
+      }
+    }
+
     async function loadTicket() {
+      startLiveSecurityClock();
       const params = new URLSearchParams(window.location.search);
       const ticketId = params.get('id') || window.location.hash.replace('#', '');
+      currentTicketId = ticketId;
 
       if (!ticketId) {
         document.getElementById('loadingBox').style.display = 'none';
@@ -178,8 +315,8 @@
         document.getElementById('eventName').textContent = event.name;
         document.getElementById('eventDatePlace').textContent = `${event.date ? new Date(event.date).toLocaleString([], { dateStyle: 'long', timeStyle: 'short' }) : 'Fecha por confirmar'} • ${event.location || 'Lugar por definir'}`;
         document.getElementById('ticketType').textContent = `ENTRADA ${ticket.type.toUpperCase()}`;
-        document.getElementById('attendeeName').textContent = ticket.attendeeName;
-        document.getElementById('attendeeDni').textContent = ticket.attendeeDni || 'No registrado';
+        document.getElementById('attendeeName').textContent = ticket.attendeeName || 'Al Portador';
+        document.getElementById('attendeeDni').textContent = ticket.attendeeDni || 'No requerido';
         document.getElementById('ticketId').textContent = ticket.id;
         document.getElementById('ticketBadgeCode').textContent = ticket.id;
         document.getElementById('ticketPrice').textContent = `${event.currency || '$'}${ticket.price}`;
@@ -187,11 +324,8 @@
 
         // Status
         const banner = document.getElementById('statusBanner');
-        const bannerText = document.getElementById('statusBannerText');
-
         if (ticket.status === 'used') {
-          banner.className = 'ticket-status-banner used';
-          banner.innerHTML = `<span>🔴</span> YA INGRESADO AL EVENTO (${new Date(ticket.usedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+          markTicketAsUsed(ticket);
         } else if (ticket.status === 'cancelled') {
           banner.className = 'ticket-status-banner used';
           banner.innerHTML = `<span>🛑</span> BOLETO CANCELADO`;
@@ -199,6 +333,9 @@
           banner.className = 'ticket-status-banner valid';
           banner.innerHTML = `<span>🟢</span> VÁLIDO PARA INGRESAR`;
         }
+
+        // Conectar a la sincronización en vivo
+        setupTicketSSE(ticket.id);
 
       } catch (err) {
         document.getElementById('loadingBox').style.display = 'none';
