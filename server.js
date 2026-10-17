@@ -27,6 +27,9 @@ const defaultEvent = {
   gatekeeperPin: "1234",
   sellerPin: "4321",
   adminPassword: "admin123",
+  sellers: [
+    { id: "seller-1", name: "Taquilla 1", pin: "4321", active: true, createdAt: new Date().toISOString() }
+  ],
   ticketTypes: [
     { id: "general", name: "General", price: 50 },
     { id: "vip", name: "VIP", price: 100 },
@@ -45,6 +48,11 @@ function getEventData() {
     if (!data.gatekeeperPin) data.gatekeeperPin = "1234";
     if (!data.sellerPin) data.sellerPin = "4321";
     if (!data.adminPassword) data.adminPassword = "admin123";
+    if (!Array.isArray(data.sellers) || data.sellers.length === 0) {
+      data.sellers = [
+        { id: "seller-1", name: "Taquilla 1", pin: data.sellerPin || "4321", active: true, createdAt: new Date().toISOString() }
+      ];
+    }
     return data;
   } catch (err) {
     return defaultEvent;
@@ -88,6 +96,24 @@ function broadcastEvent(type, data) {
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Static file fallback (allows uploading flat style.css and app.js to public/ or nested)
+app.get('/css/style.css', (req, res, next) => {
+  const nested = path.join(__dirname, 'public', 'css', 'style.css');
+  const flat = path.join(__dirname, 'public', 'style.css');
+  if (fs.existsSync(nested)) return res.sendFile(nested);
+  if (fs.existsSync(flat)) return res.sendFile(flat);
+  next();
+});
+
+app.get('/js/app.js', (req, res, next) => {
+  const nested = path.join(__dirname, 'public', 'js', 'app.js');
+  const flat = path.join(__dirname, 'public', 'app.js');
+  if (fs.existsSync(nested)) return res.sendFile(nested);
+  if (fs.existsSync(flat)) return res.sendFile(flat);
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // SSE Endpoint for live real-time sync across all devices
@@ -157,6 +183,133 @@ app.post('/api/event', (req, res) => {
   res.json({ success: true, event: updated });
 });
 
+// Sellers Management APIs
+app.get('/api/sellers', (req, res) => {
+  const event = getEventData();
+  const tickets = getTickets();
+  const activeTickets = tickets.filter(t => t.status !== 'cancelled');
+
+  const sellersWithStats = (event.sellers || []).map(seller => {
+    const sellerTickets = activeTickets.filter(t => 
+      (t.sellerId && t.sellerId === seller.id) ||
+      (t.soldBy && t.soldBy.toLowerCase() === seller.name.toLowerCase())
+    );
+    const ticketsSold = sellerTickets.length;
+    const totalRevenue = sellerTickets.reduce((sum, t) => sum + (Number(t.price) || 0), 0);
+    const cashRevenue = sellerTickets.filter(t => t.paymentMethod === 'Efectivo').reduce((sum, t) => sum + (Number(t.price) || 0), 0);
+    const digitalRevenue = totalRevenue - cashRevenue;
+    const enteredCount = sellerTickets.filter(t => t.status === 'used').length;
+
+    return {
+      id: seller.id,
+      name: seller.name,
+      pin: seller.pin,
+      active: seller.active !== false,
+      createdAt: seller.createdAt || new Date().toISOString(),
+      stats: {
+        ticketsSold,
+        totalRevenue,
+        cashRevenue,
+        digitalRevenue,
+        enteredCount
+      }
+    };
+  });
+
+  res.json({ sellers: sellersWithStats });
+});
+
+app.post('/api/sellers', (req, res) => {
+  const { name, pin } = req.body;
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ error: "El nombre del vendedor es obligatorio." });
+  }
+  const cleanPin = String(pin || '').trim();
+  if (!/^\d{4}$/.test(cleanPin)) {
+    return res.status(400).json({ error: "El PIN debe tener exactamente 4 dígitos numéricos." });
+  }
+
+  const event = getEventData();
+  if (!Array.isArray(event.sellers)) event.sellers = [];
+
+  const pinExists = event.sellers.some(s => s.pin === cleanPin);
+  if (pinExists) {
+    return res.status(400).json({ error: "Ese código PIN ya está asignado a otro vendedor. Asigne un PIN único." });
+  }
+
+  const newSeller = {
+    id: `seller-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    name: String(name).trim(),
+    pin: cleanPin,
+    active: true,
+    createdAt: new Date().toISOString()
+  };
+
+  event.sellers.push(newSeller);
+  saveEventData(event);
+  broadcastEvent('SELLERS_UPDATED', { sellers: event.sellers });
+
+  res.json({ success: true, seller: newSeller });
+});
+
+app.put('/api/sellers/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, pin, active } = req.body;
+
+  const event = getEventData();
+  if (!Array.isArray(event.sellers)) event.sellers = [];
+
+  const sellerIndex = event.sellers.findIndex(s => s.id === id);
+  if (sellerIndex === -1) {
+    return res.status(404).json({ error: "Vendedor no encontrado." });
+  }
+
+  if (name !== undefined) {
+    const cleanName = String(name).trim();
+    if (!cleanName) return res.status(400).json({ error: "El nombre no puede estar vacío." });
+    event.sellers[sellerIndex].name = cleanName;
+  }
+
+  if (pin !== undefined) {
+    const cleanPin = String(pin).trim();
+    if (!/^\d{4}$/.test(cleanPin)) {
+      return res.status(400).json({ error: "El PIN debe tener 4 dígitos numéricos." });
+    }
+    const pinExists = event.sellers.some(s => s.id !== id && s.pin === cleanPin);
+    if (pinExists) {
+      return res.status(400).json({ error: "El PIN ya pertenece a otro vendedor." });
+    }
+    event.sellers[sellerIndex].pin = cleanPin;
+  }
+
+  if (active !== undefined) {
+    event.sellers[sellerIndex].active = Boolean(active);
+  }
+
+  saveEventData(event);
+  broadcastEvent('SELLERS_UPDATED', { sellers: event.sellers });
+
+  res.json({ success: true, seller: event.sellers[sellerIndex] });
+});
+
+app.delete('/api/sellers/:id', (req, res) => {
+  const { id } = req.params;
+  const event = getEventData();
+  if (!Array.isArray(event.sellers)) event.sellers = [];
+
+  const prevLen = event.sellers.length;
+  event.sellers = event.sellers.filter(s => s.id !== id);
+
+  if (event.sellers.length === prevLen) {
+    return res.status(404).json({ error: "Vendedor no encontrado." });
+  }
+
+  saveEventData(event);
+  broadcastEvent('SELLERS_UPDATED', { sellers: event.sellers });
+
+  res.json({ success: true, message: "Vendedor eliminado correctamente." });
+});
+
 // Authentication APIs
 app.post('/api/auth/gatekeeper', (req, res) => {
   const { pin } = req.body;
@@ -173,22 +326,39 @@ app.post('/api/auth/gatekeeper', (req, res) => {
 app.post('/api/auth/seller', (req, res) => {
   const { pin, sellerName } = req.body;
   const event = getEventData();
-  const currentPin = String(event.sellerPin || '4321').trim();
+  const cleanPin = String(pin || '').trim();
 
-  if (String(pin).trim() === currentPin) {
-    const resolvedName = (sellerName && String(sellerName).trim()) ? String(sellerName).trim() : 'Taquilla 1';
-    res.json({
+  // 1. Search in individual sellers list
+  const sellers = Array.isArray(event.sellers) ? event.sellers : [];
+  const matchedSeller = sellers.find(s => s.pin === cleanPin && s.active !== false);
+
+  if (matchedSeller) {
+    return res.json({
       success: true,
       role: 'seller',
+      sellerId: matchedSeller.id,
+      sellerName: matchedSeller.name,
+      eventName: event.name
+    });
+  }
+
+  // 2. Fallback against default sellerPin
+  const defaultPin = String(event.sellerPin || '4321').trim();
+  if (cleanPin === defaultPin) {
+    const resolvedName = (sellerName && String(sellerName).trim()) ? String(sellerName).trim() : 'Taquilla 1';
+    return res.json({
+      success: true,
+      role: 'seller',
+      sellerId: 'seller-default',
       sellerName: resolvedName,
       eventName: event.name
     });
-  } else {
-    res.status(401).json({
-      success: false,
-      error: "PIN de vendedor incorrecto. Ingrese el código de 4 cifras asignado para ventas/taquilla."
-    });
   }
+
+  res.status(401).json({
+    success: false,
+    error: "PIN de vendedor no reconocido o inactivo. Contacte al administrador para verificar su código."
+  });
 });
 
 app.post('/api/auth/admin', (req, res) => {
@@ -217,6 +387,48 @@ function calculateStats(tickets, event) {
     return sum + extraScans;
   }, 0);
 
+  // Sales breakdown by seller
+  const salesBySellerMap = {};
+  if (Array.isArray(event.sellers)) {
+    event.sellers.forEach(s => {
+      salesBySellerMap[s.name] = {
+        sellerId: s.id,
+        sellerName: s.name,
+        ticketsCount: 0,
+        totalRevenue: 0,
+        cashRevenue: 0,
+        digitalRevenue: 0,
+        active: s.active !== false
+      };
+    });
+  }
+
+  activeTickets.forEach(t => {
+    const name = t.soldBy || 'Administración';
+    if (!salesBySellerMap[name]) {
+      salesBySellerMap[name] = {
+        sellerId: t.sellerId || null,
+        sellerName: name,
+        ticketsCount: 0,
+        totalRevenue: 0,
+        cashRevenue: 0,
+        digitalRevenue: 0,
+        active: true
+      };
+    }
+    const s = salesBySellerMap[name];
+    s.ticketsCount += 1;
+    const price = Number(t.price) || 0;
+    s.totalRevenue += price;
+    if (t.paymentMethod === 'Efectivo') {
+      s.cashRevenue += price;
+    } else {
+      s.digitalRevenue += price;
+    }
+  });
+
+  const salesBySeller = Object.values(salesBySellerMap).sort((a, b) => b.totalRevenue - a.totalRevenue);
+
   return {
     totalIssued,
     activeCount: activeTickets.length,
@@ -226,7 +438,8 @@ function calculateStats(tickets, event) {
     totalRevenue,
     fraudAttempts,
     capacity: event.capacity,
-    occupancyPercent: event.capacity > 0 ? Math.round((usedTickets.length / event.capacity) * 100) : 0
+    occupancyPercent: event.capacity > 0 ? Math.round((usedTickets.length / event.capacity) * 100) : 0,
+    salesBySeller
   };
 }
 
@@ -245,7 +458,7 @@ app.get('/api/tickets', (req, res) => {
 // Create new ticket (Simplified: Name and DNI are optional, supports quantity batch creation!)
 app.post('/api/tickets', async (req, res) => {
   try {
-    const { attendeeName, attendeePhone, attendeeDni, attendeeEmail, type, price, paymentMethod, notes, quantity, soldBy } = req.body;
+    const { attendeeName, attendeePhone, attendeeDni, attendeeEmail, type, price, paymentMethod, notes, quantity, soldBy, sellerId } = req.body;
 
     const tickets = getTickets();
     const event = getEventData();
@@ -314,6 +527,7 @@ app.post('/api/tickets', async (req, res) => {
         paymentMethod: paymentMethod || 'Efectivo',
         notes: notes ? notes.trim() : '',
         soldBy: resolvedSoldBy,
+        sellerId: sellerId || null,
         status: 'valid', // 'valid', 'used', 'cancelled'
         createdAt: new Date().toISOString(),
         usedAt: null,

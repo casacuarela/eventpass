@@ -9,3 +9,8 @@ yarn-error.log*
 # Sistema operativo
 .DS_Store
 Thumbs.db
+
+# Paquetes locales de exportación
+SUBIR_A_GITHUB/
+SUBIR_A_GITHUB.zip
+prepare-github.js
