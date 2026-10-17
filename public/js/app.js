@@ -9,6 +9,13 @@ let appState = {
   tickets: [],
   stats: {},
   activeTab: 'dashboard',
+  userRole: null, // 'gatekeeper', 'seller' or 'admin'
+  sellerName: 'Taquilla 1',
+  posCart: {},
+  posPaymentMethod: 'Efectivo',
+  posBuyerType: 'bearer',
+  posCashReceived: 0,
+  lastSoldTickets: [],
   html5QrCode: null,
   isScanning: false,
   currentCameraId: null,
@@ -122,13 +129,350 @@ class SoundEffects {
 const sounds = new SoundEffects();
 
 // ============================================================================
-// 2. INICIALIZACIÓN Y NAVEGACIÓN
+// 2. SISTEMA DE AUTENTICACIÓN Y ESPACIOS SEPARADOS (PORTERO, VENDEDOR Y ADMIN)
+// ============================================================================
+function initAuth() {
+  const savedRole = sessionStorage.getItem('eventpass_role');
+  if (savedRole === 'gatekeeper' || savedRole === 'seller' || savedRole === 'admin') {
+    applyRole(savedRole);
+  } else {
+    showAuthOverlay();
+  }
+}
+
+function showAuthOverlay() {
+  const overlay = document.getElementById('authOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    selectAuthRole('gatekeeper');
+  }
+}
+
+function hideAuthOverlay() {
+  const overlay = document.getElementById('authOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+function selectAuthRole(role) {
+  const tabGate = document.getElementById('tabRoleGatekeeper');
+  const tabSeller = document.getElementById('tabRoleSeller');
+  const tabAdmin = document.getElementById('tabRoleAdmin');
+  const formGate = document.getElementById('formGatekeeperAuth');
+  const formSeller = document.getElementById('formSellerAuth');
+  const formAdmin = document.getElementById('formAdminAuth');
+
+  if (tabGate) tabGate.classList.toggle('active', role === 'gatekeeper');
+  if (tabSeller) tabSeller.classList.toggle('active', role === 'seller');
+  if (tabAdmin) tabAdmin.classList.toggle('active', role === 'admin');
+
+  if (formGate) formGate.style.display = role === 'gatekeeper' ? 'block' : 'none';
+  if (formSeller) formSeller.style.display = role === 'seller' ? 'block' : 'none';
+  if (formAdmin) formAdmin.style.display = role === 'admin' ? 'block' : 'none';
+
+  if (role === 'gatekeeper') {
+    const errEl = document.getElementById('gatekeeperErrorMsg');
+    if (errEl) errEl.textContent = '';
+    const pinInp = document.getElementById('gatekeeperPinInput');
+    if (pinInp) {
+      pinInp.value = '';
+      pinInp.focus();
+    }
+  } else if (role === 'seller') {
+    const errEl = document.getElementById('sellerErrorMsg');
+    if (errEl) errEl.textContent = '';
+    const pinInp = document.getElementById('sellerPinInput');
+    if (pinInp) {
+      pinInp.value = '';
+      pinInp.focus();
+    }
+  } else {
+    const errEl = document.getElementById('adminErrorMsg');
+    if (errEl) errEl.textContent = '';
+    const passInp = document.getElementById('adminPasswordInput');
+    if (passInp) {
+      passInp.value = '';
+      passInp.focus();
+    }
+  }
+}
+
+function appendPinDigit(digit) {
+  const pinInput = document.getElementById('gatekeeperPinInput');
+  if (pinInput && pinInput.value.length < 4) {
+    pinInput.value += digit;
+    if (pinInput.value.length === 4) {
+      submitGatekeeperAuth();
+    }
+  }
+}
+
+function clearPinDigits() {
+  const pinInput = document.getElementById('gatekeeperPinInput');
+  if (pinInput) pinInput.value = '';
+  const errEl = document.getElementById('gatekeeperErrorMsg');
+  if (errEl) errEl.textContent = '';
+}
+
+function deletePinDigit() {
+  const pinInput = document.getElementById('gatekeeperPinInput');
+  if (pinInput && pinInput.value.length > 0) {
+    pinInput.value = pinInput.value.slice(0, -1);
+  }
+}
+
+function appendSellerPinDigit(digit) {
+  const pinInput = document.getElementById('sellerPinInput');
+  if (pinInput && pinInput.value.length < 4) {
+    pinInput.value += digit;
+    if (pinInput.value.length === 4) {
+      submitSellerAuth();
+    }
+  }
+}
+
+function clearSellerPinDigits() {
+  const pinInput = document.getElementById('sellerPinInput');
+  if (pinInput) pinInput.value = '';
+  const errEl = document.getElementById('sellerErrorMsg');
+  if (errEl) errEl.textContent = '';
+}
+
+function deleteSellerPinDigit() {
+  const pinInput = document.getElementById('sellerPinInput');
+  if (pinInput && pinInput.value.length > 0) {
+    pinInput.value = pinInput.value.slice(0, -1);
+  }
+}
+
+async function submitGatekeeperAuth() {
+  const pinInput = document.getElementById('gatekeeperPinInput');
+  const errorEl = document.getElementById('gatekeeperErrorMsg');
+  const pin = (pinInput ? pinInput.value : '').trim();
+
+  if (pin.length !== 4) {
+    if (errorEl) errorEl.textContent = 'El PIN debe tener 4 cifras numéricas.';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/gatekeeper', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin })
+    });
+    const data = await res.json();
+    if (data.success) {
+      sounds.playSuccess();
+      sessionStorage.setItem('eventpass_role', 'gatekeeper');
+      applyRole('gatekeeper');
+      hideAuthOverlay();
+    } else {
+      sounds.playWarning();
+      if (errorEl) errorEl.textContent = data.error || 'PIN incorrecto.';
+      clearPinDigits();
+    }
+  } catch (err) {
+    if (errorEl) errorEl.textContent = 'Error al verificar credenciales con el servidor.';
+  }
+}
+
+async function submitSellerAuth() {
+  const pinInput = document.getElementById('sellerPinInput');
+  const nameInput = document.getElementById('sellerNameInput');
+  const errorEl = document.getElementById('sellerErrorMsg');
+  const pin = (pinInput ? pinInput.value : '').trim();
+  const sellerName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : 'Taquilla 1';
+
+  if (pin.length !== 4) {
+    if (errorEl) errorEl.textContent = 'El PIN debe tener 4 cifras numéricas.';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/seller', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, sellerName })
+    });
+    const data = await res.json();
+    if (data.success) {
+      sounds.playSuccess();
+      sessionStorage.setItem('eventpass_role', 'seller');
+      sessionStorage.setItem('eventpass_seller_name', data.sellerName);
+      appState.sellerName = data.sellerName;
+      applyRole('seller');
+      hideAuthOverlay();
+    } else {
+      sounds.playWarning();
+      if (errorEl) errorEl.textContent = data.error || 'PIN de vendedor incorrecto.';
+      clearSellerPinDigits();
+    }
+  } catch (err) {
+    if (errorEl) errorEl.textContent = 'Error al verificar credenciales con el servidor.';
+  }
+}
+
+async function submitAdminAuth() {
+  const passInput = document.getElementById('adminPasswordInput');
+  const errorEl = document.getElementById('adminErrorMsg');
+  const password = (passInput ? passInput.value : '').trim();
+
+  if (!password) {
+    if (errorEl) errorEl.textContent = 'Ingresa la contraseña de administrador.';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const data = await res.json();
+    if (data.success) {
+      sounds.playSuccess();
+      sessionStorage.setItem('eventpass_role', 'admin');
+      applyRole('admin');
+      hideAuthOverlay();
+    } else {
+      sounds.playWarning();
+      if (errorEl) errorEl.textContent = data.error || 'Contraseña incorrecta.';
+    }
+  } catch (err) {
+    if (errorEl) errorEl.textContent = 'Error al comunicarse con el servidor.';
+  }
+}
+
+function applyRole(role) {
+  appState.userRole = role;
+  const roleBadge = document.getElementById('userRoleBadge');
+  const roleIcon = document.getElementById('userRoleIcon');
+  const roleText = document.getElementById('userRoleText');
+  const btnLogout = document.getElementById('btnLogout');
+  const btnSwitchGate = document.getElementById('btnSwitchToGatekeeper');
+  const btnSwitchSeller = document.getElementById('btnSwitchToSeller');
+
+  const topIcon = document.getElementById('userRoleIconDisplay');
+  const topText = document.getElementById('userRoleTextDisplay');
+  const dropTitle = document.getElementById('userDropdownRoleTitle');
+
+  if (role === 'gatekeeper') {
+    document.body.classList.remove('seller-active-mode');
+    document.body.classList.add('gatekeeper-active-mode');
+    if (roleBadge) {
+      roleBadge.style.display = 'inline-flex';
+      roleBadge.className = 'gatekeeper-banner-pill';
+      if (roleIcon) roleIcon.textContent = '🚪';
+      if (roleText) roleText.textContent = 'Turno Portería';
+    }
+    if (topIcon) topIcon.textContent = '🚪';
+    if (topText) topText.textContent = 'Portería';
+    if (dropTitle) dropTitle.textContent = 'Control de Acceso Portería';
+
+    if (btnLogout) {
+      btnLogout.style.display = 'flex';
+      btnLogout.innerHTML = '<span>🚪</span> Salir de Portería';
+    }
+    if (btnSwitchGate) btnSwitchGate.style.display = 'none';
+    if (btnSwitchSeller) btnSwitchSeller.style.display = 'none';
+
+    // Switch and lock to scanner tab
+    switchTab('scanner');
+  } else if (role === 'seller') {
+    document.body.classList.remove('gatekeeper-active-mode');
+    document.body.classList.add('seller-active-mode');
+    const sName = sessionStorage.getItem('eventpass_seller_name') || appState.sellerName || 'Taquilla 1';
+    appState.sellerName = sName;
+    if (roleBadge) {
+      roleBadge.style.display = 'inline-flex';
+      roleBadge.className = 'seller-banner-pill';
+      if (roleIcon) roleIcon.textContent = '🎟️';
+      if (roleText) roleText.textContent = `Taquilla: ${sName}`;
+    }
+    if (topIcon) topIcon.textContent = '🎟️';
+    if (topText) topText.textContent = sName;
+    if (dropTitle) dropTitle.textContent = `Vendedor: ${sName}`;
+
+    if (btnLogout) {
+      btnLogout.style.display = 'flex';
+      btnLogout.innerHTML = '<span>🚪</span> Salir de Taquilla';
+    }
+    if (btnSwitchGate) btnSwitchGate.style.display = 'none';
+    if (btnSwitchSeller) btnSwitchSeller.style.display = 'none';
+
+    // Switch to POS tab
+    switchTab('pos');
+  } else if (role === 'admin') {
+    document.body.classList.remove('gatekeeper-active-mode');
+    document.body.classList.remove('seller-active-mode');
+    if (roleBadge) {
+      roleBadge.style.display = 'inline-flex';
+      roleBadge.className = 'gatekeeper-banner-pill';
+      if (roleIcon) roleIcon.textContent = '👑';
+      if (roleText) roleText.textContent = 'Administrador';
+    }
+    if (topIcon) topIcon.textContent = '👑';
+    if (topText) topText.textContent = 'Administrador';
+    if (dropTitle) dropTitle.textContent = 'Administrador Principal';
+
+    if (btnLogout) {
+      btnLogout.style.display = 'flex';
+      btnLogout.innerHTML = '<span>🔒</span> Salir';
+    }
+    if (btnSwitchGate) {
+      btnSwitchGate.style.display = 'flex';
+    }
+    if (btnSwitchSeller) {
+      btnSwitchSeller.style.display = 'flex';
+    }
+
+    if (appState.activeTab === 'scanner' || appState.activeTab === 'pos' || appState.activeTab === 'seller-box') {
+      // Keep user where they are
+    } else {
+      switchTab('dashboard');
+    }
+  }
+}
+
+function logout() {
+  sessionStorage.removeItem('eventpass_role');
+  sessionStorage.removeItem('eventpass_seller_name');
+  appState.userRole = null;
+  document.body.classList.remove('gatekeeper-active-mode');
+  document.body.classList.remove('seller-active-mode');
+  const roleBadge = document.getElementById('userRoleBadge');
+  if (roleBadge) roleBadge.style.display = 'none';
+  const btnLogout = document.getElementById('btnLogout');
+  if (btnLogout) btnLogout.style.display = 'none';
+  const btnSwitchGate = document.getElementById('btnSwitchToGatekeeper');
+  if (btnSwitchGate) btnSwitchGate.style.display = 'none';
+  const btnSwitchSeller = document.getElementById('btnSwitchToSeller');
+  if (btnSwitchSeller) btnSwitchSeller.style.display = 'none';
+  toggleUserDropdown(false);
+  stopCamera();
+  showAuthOverlay();
+}
+
+// Global exposure for inline HTML callbacks
+window.selectAuthRole = selectAuthRole;
+window.appendPinDigit = appendPinDigit;
+window.clearPinDigits = clearPinDigits;
+window.deletePinDigit = deletePinDigit;
+window.appendSellerPinDigit = appendSellerPinDigit;
+window.clearSellerPinDigits = clearSellerPinDigits;
+window.deleteSellerPinDigit = deleteSellerPinDigit;
+
+// ============================================================================
+// 3. INICIALIZACIÓN Y NAVEGACIÓN
 // ============================================================================
 window.addEventListener('DOMContentLoaded', async () => {
   setupTabs();
   setupEventListeners();
   await loadInitialData();
   setupSSE();
+  initAuth();
 });
 
 function setupTabs() {
@@ -142,6 +486,14 @@ function setupTabs() {
 }
 
 function switchTab(tabName) {
+  // If gatekeeper, they can only see scanner
+  if (appState.userRole === 'gatekeeper' && tabName !== 'scanner') {
+    tabName = 'scanner';
+  }
+  // If seller, they can only see pos or seller-box
+  if (appState.userRole === 'seller' && tabName !== 'pos' && tabName !== 'seller-box') {
+    tabName = 'pos';
+  }
   appState.activeTab = tabName;
 
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -152,6 +504,32 @@ function switchTab(tabName) {
     section.classList.toggle('active', section.id === `tab-${tabName}`);
   });
 
+  // Actualizar migas de pan / título de vista en la topbar
+  const topbarTitle = document.getElementById('topbarCurrentViewTitle');
+  if (topbarTitle) {
+    const titles = {
+      dashboard: 'Dashboard',
+      pos: 'Punto de Venta',
+      sell: 'Emitir Entrada',
+      attendees: 'Asistentes',
+      scanner: 'Escáner Portería',
+      'seller-box': 'Corte de Caja',
+      settings: 'Ajustes del Evento'
+    };
+    topbarTitle.textContent = titles[tabName] || tabName;
+  }
+
+  // Cerrar menú móvil automáticamente al navegar
+  toggleMobileSidebar(false);
+  toggleUserDropdown(false);
+
+  if (tabName === 'pos') {
+    renderPosCatalog();
+    updatePosCartUI();
+  } else if (tabName === 'seller-box') {
+    renderSellerShiftBox();
+  }
+
   // Manejo especial de la cámara si se entra o sale de la pestaña de Scanner
   if (tabName === 'scanner') {
     startCamera();
@@ -160,8 +538,26 @@ function switchTab(tabName) {
   }
 }
 
+function toggleMobileSidebar(forceState) {
+  const sidebar = document.getElementById('appSidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebar) return;
+  const isOpen = forceState !== undefined ? forceState : !sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', isOpen);
+  if (backdrop) backdrop.classList.toggle('active', isOpen);
+}
+
+function toggleUserDropdown(forceState) {
+  const menu = document.getElementById('userDropdownMenu');
+  if (!menu) return;
+  const isOpen = forceState !== undefined ? forceState : !menu.classList.contains('open');
+  menu.classList.toggle('open', isOpen);
+  const btn = document.getElementById('userMenuBtn');
+  if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+}
+
 // ============================================================================
-// 3. CARGA DE DATOS & SINCRONIZACIÓN EN TIEMPO REAL (SSE)
+// 4. CARGA DE DATOS & SINCRONIZACIÓN EN TIEMPO REAL (SSE)
 // ============================================================================
 async function loadInitialData() {
   try {
@@ -219,6 +615,8 @@ function handleLiveEvent({ type, data }) {
     if (data.stats) appState.stats = data.stats;
     renderKPIs();
     renderAttendeesTable();
+    if (appState.activeTab === 'pos') renderPosCatalog();
+    if (appState.activeTab === 'seller-box') renderSellerShiftBox();
   } else if (type === 'TICKET_SCANNED' || type === 'FRAUD_DETECTED' || type === 'TICKET_UPDATED') {
     // Actualizar el ticket en la lista
     const idx = appState.tickets.findIndex(t => t.id === data.ticket.id);
@@ -228,11 +626,13 @@ function handleLiveEvent({ type, data }) {
     if (data.stats) appState.stats = data.stats;
     renderKPIs();
     renderAttendeesTable();
+    if (appState.activeTab === 'seller-box') renderSellerShiftBox();
   } else if (type === 'EVENT_UPDATED') {
     appState.event = data;
     renderEventInfo();
     populateTicketTypeSelect();
     populateSettingsForm();
+    if (appState.activeTab === 'pos') renderPosCatalog();
   } else if (type === 'DATA_RESET') {
     loadInitialData();
   }
@@ -285,6 +685,12 @@ function renderKPIs() {
   } else {
     fill.style.background = 'linear-gradient(90deg, #10b981 0%, #6366f1 100%)';
   }
+
+  // Actualizar HUD de portería
+  const counterEl = document.getElementById('porteroCounterText');
+  if (counterEl) {
+    counterEl.textContent = `${entered} / ${capacity} (${percent}%)`;
+  }
 }
 
 function populateTicketTypeSelect() {
@@ -319,11 +725,31 @@ function renderAttendeesTable() {
   const tbody = document.getElementById('attendeesTableBody');
   const search = (document.getElementById('attendeesSearchInput').value || '').toLowerCase().trim();
   const filterStatus = document.getElementById('filterStatusSelect').value;
+  const filterSellerEl = document.getElementById('filterSellerSelect');
+  const filterSeller = filterSellerEl ? filterSellerEl.value : 'all';
   const currency = (appState.event && appState.event.currency) || '$';
+
+  // Poblar opciones del filtro de vendedores dinámicamente
+  if (filterSellerEl) {
+    const currentVal = filterSellerEl.value;
+    const sellers = Array.from(new Set(appState.tickets.map(t => t.soldBy || 'Administración')));
+    let optionsHtml = '<option value="all">Todos los vendedores</option>';
+    sellers.forEach(s => {
+      optionsHtml += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
+    });
+    if (filterSellerEl.dataset.lastCount !== String(sellers.length)) {
+      filterSellerEl.innerHTML = optionsHtml;
+      filterSellerEl.value = currentVal || 'all';
+      filterSellerEl.dataset.lastCount = String(sellers.length);
+    }
+  }
 
   let filtered = appState.tickets.filter(t => {
     // Filtro estado
     if (filterStatus !== 'all' && t.status !== filterStatus) return false;
+
+    // Filtro vendedor
+    if (filterSeller !== 'all' && (t.soldBy || 'Administración') !== filterSeller) return false;
 
     // Búsqueda de texto
     if (!search) return true;
@@ -331,14 +757,15 @@ function renderAttendeesTable() {
       t.attendeeName.toLowerCase().includes(search) ||
       t.id.toLowerCase().includes(search) ||
       (t.attendeeDni && t.attendeeDni.toLowerCase().includes(search)) ||
-      (t.attendeePhone && t.attendeePhone.toLowerCase().includes(search))
+      (t.attendeePhone && t.attendeePhone.toLowerCase().includes(search)) ||
+      (t.soldBy && t.soldBy.toLowerCase().includes(search))
     );
   });
 
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+        <td colspan="9" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
           No se encontraron boletos que coincidan con los filtros.
         </td>
       </tr>
@@ -369,6 +796,8 @@ function renderAttendeesTable() {
       ? `<span class="badge badge-vip" style="font-size: 0.68rem; margin-left: 0.35rem;" title="Transferido previamente (${t.transferHistory.length} vez/veces)">🔄 Transferido</span>`
       : '';
 
+    const vendedorNombre = t.soldBy || 'Administración';
+
     return `
       <tr>
         <td style="font-family: monospace; font-weight: 700; color: #38bdf8;">${t.id}</td>
@@ -379,6 +808,7 @@ function renderAttendeesTable() {
         <td>${typeBadge}</td>
         <td>${currency}${t.price}</td>
         <td style="font-size: 0.82rem; color: var(--text-secondary);">${t.paymentMethod || 'Efectivo'}</td>
+        <td style="font-size: 0.82rem; color: #38bdf8; font-weight: 600;">${escapeHtml(vendedorNombre)}</td>
         <td>${statusBadge}</td>
         <td style="font-size: 0.85rem;">${ingresoHora}</td>
         <td style="text-align: right;">
@@ -580,6 +1010,12 @@ function displayScanResult(data) {
   }
 
   card.className = 'scan-result-card';
+  card.style.display = 'block';
+
+  if (scanResultTimer) {
+    clearTimeout(scanResultTimer);
+    scanResultTimer = null;
+  }
 
   if (data.status === 'success') {
     sounds.playSuccess();
@@ -593,6 +1029,9 @@ function displayScanResult(data) {
     document.getElementById('resType').textContent = data.ticket.type;
     document.getElementById('resId').textContent = data.ticket.id;
     document.getElementById('resTime').textContent = new Date().toLocaleTimeString();
+
+    // Auto-dismiss en 3.2 segundos para que el portero no tenga que tocar la pantalla
+    scanResultTimer = setTimeout(dismissScanResult, 3200);
 
   } else if (data.status === 'fraud_already_used') {
     sounds.playFraudAlert();
@@ -637,10 +1076,52 @@ function displayScanResult(data) {
     desc.textContent = data.message;
     details.style.display = 'none';
   }
-
-  // Scroll a la tarjeta de resultado en móvil
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+
+let scanResultTimer = null;
+
+function dismissScanResult() {
+  if (scanResultTimer) {
+    clearTimeout(scanResultTimer);
+    scanResultTimer = null;
+  }
+  const card = document.getElementById('scanResultCard');
+  if (card) card.style.display = 'none';
+}
+
+function toggleManualDrawer(show) {
+  const drawer = document.getElementById('drawerManualInput');
+  if (!drawer) return;
+  const isCurrentlyOpen = drawer.style.display !== 'none';
+  const shouldOpen = show !== undefined ? show : !isCurrentlyOpen;
+  drawer.style.display = shouldOpen ? 'block' : 'none';
+  const btn = document.getElementById('btnToggleManualDrawer');
+  if (btn) btn.classList.toggle('active', shouldOpen);
+  if (shouldOpen) {
+    toggleHistoryDrawer(false);
+    const inp = document.getElementById('manualTicketCode');
+    if (inp) {
+      inp.focus();
+    }
+  }
+}
+
+function toggleHistoryDrawer(show) {
+  const drawer = document.getElementById('drawerHistory');
+  if (!drawer) return;
+  const isCurrentlyOpen = drawer.style.display !== 'none';
+  const shouldOpen = show !== undefined ? show : !isCurrentlyOpen;
+  drawer.style.display = shouldOpen ? 'block' : 'none';
+  const btn = document.getElementById('btnToggleHistoryDrawer');
+  if (btn) btn.classList.toggle('active', shouldOpen);
+  if (shouldOpen) {
+    toggleManualDrawer(false);
+  }
+}
+
+window.dismissScanResult = dismissScanResult;
+window.toggleManualDrawer = toggleManualDrawer;
+window.toggleHistoryDrawer = toggleHistoryDrawer;
 
 function addRecentScanLog(data) {
   const container = document.getElementById('recentScansList');
@@ -693,17 +1174,18 @@ function setupEventListeners() {
     }
   });
 
-  // Formulario de emisión de boleto
+  // Formulario de emisión de boleto (Simplificado)
   document.getElementById('sellTicketForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const name = document.getElementById('attendeeName').value;
-    const phone = document.getElementById('attendeePhone').value;
-    const dni = document.getElementById('attendeeDni').value;
+    const name = document.getElementById('attendeeName').value.trim();
+    const phone = document.getElementById('attendeePhone').value.trim();
+    const dni = document.getElementById('attendeeDni').value.trim();
     const type = document.getElementById('ticketTypeSelect').value;
     const price = document.getElementById('ticketPrice').value;
     const paymentMethod = document.getElementById('paymentMethod').value;
-    const notes = document.getElementById('ticketNotes').value;
+    const notes = document.getElementById('ticketNotes').value.trim();
+    const quantity = parseInt(document.getElementById('ticketQuantity').value, 10) || 1;
 
     try {
       const res = await fetch('/api/tickets', {
@@ -716,7 +1198,9 @@ function setupEventListeners() {
           type: type,
           price: price,
           paymentMethod: paymentMethod,
-          notes: notes
+          notes: notes,
+          quantity: quantity,
+          soldBy: appState.userRole === 'seller' ? (appState.sellerName || 'Vendedor Taquilla') : 'Administración'
         })
       });
 
@@ -728,9 +1212,17 @@ function setupEventListeners() {
         document.getElementById('attendeePhone').value = '';
         document.getElementById('attendeeDni').value = '';
         document.getElementById('ticketNotes').value = '';
+        document.getElementById('ticketQuantity').value = '1';
 
-        // Abrir de inmediato el boleto generado
-        openTicketModal(data.ticket.id);
+        if (data.count > 1) {
+          showActionAlertModal('🎉', 'Lote de Boletos Emitido', `¡Se han generado con éxito <strong>${data.count} boletos</strong> con códigos QR únicos!`);
+          setTimeout(() => {
+            openTicketModal(data.ticket.id);
+          }, 1500);
+        } else {
+          // Abrir de inmediato el boleto generado
+          openTicketModal(data.ticket.id);
+        }
       } else {
         showActionAlertModal('⚠️', 'Error al Emitir Boleto', data.error || 'Error al emitir el boleto.');
       }
@@ -739,6 +1231,93 @@ function setupEventListeners() {
       showActionAlertModal('🛑', 'Error de Conexión', 'No se pudo comunicar con el servidor para emitir el boleto.');
     }
   });
+
+  // Listeners de Formularios de Autenticación
+  const formGate = document.getElementById('formGatekeeperAuth');
+  if (formGate) {
+    formGate.addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitGatekeeperAuth();
+    });
+  }
+
+  const formSeller = document.getElementById('formSellerAuth');
+  if (formSeller) {
+    formSeller.addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitSellerAuth();
+    });
+  }
+
+  const formAdm = document.getElementById('formAdminAuth');
+  if (formAdm) {
+    formAdm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitAdminAuth();
+    });
+  }
+
+  const btnLogout = document.getElementById('btnLogout');
+  if (btnLogout) {
+    btnLogout.addEventListener('click', () => {
+      toggleUserDropdown(false);
+      logout();
+    });
+  }
+
+  const btnSwitchGate = document.getElementById('btnSwitchToGatekeeper');
+  if (btnSwitchGate) {
+    btnSwitchGate.addEventListener('click', () => {
+      toggleUserDropdown(false);
+      switchTab('scanner');
+    });
+  }
+
+  const btnSwitchSeller = document.getElementById('btnSwitchToSeller');
+  if (btnSwitchSeller) {
+    btnSwitchSeller.addEventListener('click', () => {
+      toggleUserDropdown(false);
+      switchTab('pos');
+    });
+  }
+
+  // Menú de Usuario / Selector de Modo
+  const userMenuBtn = document.getElementById('userMenuBtn');
+  if (userMenuBtn) {
+    userMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleUserDropdown();
+    });
+  }
+
+  // Cerrar dropdown al hacer clic en cualquier lugar fuera de él
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('userDropdownMenu');
+    const trigger = document.getElementById('userMenuBtn');
+    if (dropdown && dropdown.classList.contains('open')) {
+      if (!dropdown.contains(e.target) && (!trigger || !trigger.contains(e.target))) {
+        toggleUserDropdown(false);
+      }
+    }
+  });
+
+  // Control de Apertura / Cierre de Cajón Lateral en Móviles
+  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+  if (mobileMenuBtn) {
+    mobileMenuBtn.addEventListener('click', () => toggleMobileSidebar(true));
+  }
+  const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+  if (sidebarCloseBtn) {
+    sidebarCloseBtn.addEventListener('click', () => toggleMobileSidebar(false));
+  }
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+  if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener('click', () => toggleMobileSidebar(false));
+  }
+  const mobileNavMoreBtn = document.getElementById('mobileNavMoreBtn');
+  if (mobileNavMoreBtn) {
+    mobileNavMoreBtn.addEventListener('click', () => toggleMobileSidebar(true));
+  }
 
   // Formulario manual de scanner
   document.getElementById('manualScanForm').addEventListener('submit', (e) => {
@@ -752,37 +1331,77 @@ function setupEventListeners() {
   });
 
   // Botón ocultar resultado para continuar (abajo y arriba)
-  document.getElementById('btnDismissResult').addEventListener('click', () => {
-    document.getElementById('scanResultCard').style.display = 'none';
-  });
+  const btnDismissResult = document.getElementById('btnDismissResult');
+  if (btnDismissResult) {
+    btnDismissResult.addEventListener('click', dismissScanResult);
+  }
   const btnDismissResultTop = document.getElementById('btnDismissResultTop');
   if (btnDismissResultTop) {
-    btnDismissResultTop.addEventListener('click', () => {
-      document.getElementById('scanResultCard').style.display = 'none';
+    btnDismissResultTop.addEventListener('click', dismissScanResult);
+  }
+
+  // Controles HUD de portería (Zero-Scroll)
+  const btnHudSwitchCamera = document.getElementById('btnHudSwitchCamera');
+  if (btnHudSwitchCamera) {
+    btnHudSwitchCamera.addEventListener('click', switchCamera);
+  }
+
+  const btnHudToggleAudio = document.getElementById('btnHudToggleAudio');
+  if (btnHudToggleAudio) {
+    btnHudToggleAudio.addEventListener('click', () => {
+      appState.audioEnabled = !appState.audioEnabled;
+      const hudIcon = document.getElementById('hudAudioIcon');
+      if (hudIcon) hudIcon.textContent = appState.audioEnabled ? '🔊' : '🔇';
+      const audioIcon = document.getElementById('audioIcon');
+      if (audioIcon) audioIcon.textContent = appState.audioEnabled ? '🔊' : '🔇';
     });
   }
 
-  // Controles de cámara
-  document.getElementById('btnToggleCamera').addEventListener('click', () => {
-    if (appState.isScanning) {
-      stopCamera();
-    } else {
-      startCamera();
-    }
-  });
+  const btnToggleManualDrawer = document.getElementById('btnToggleManualDrawer');
+  if (btnToggleManualDrawer) {
+    btnToggleManualDrawer.addEventListener('click', () => toggleManualDrawer());
+  }
 
-  document.getElementById('btnSwitchCamera').addEventListener('click', switchCamera);
+  const btnToggleHistoryDrawer = document.getElementById('btnToggleHistoryDrawer');
+  if (btnToggleHistoryDrawer) {
+    btnToggleHistoryDrawer.addEventListener('click', () => toggleHistoryDrawer());
+  }
 
-  // Toggle sonido
-  document.getElementById('btnToggleAudio').addEventListener('click', () => {
-    appState.audioEnabled = !appState.audioEnabled;
-    document.getElementById('audioIcon').textContent = appState.audioEnabled ? '🔊' : '🔇';
-    document.getElementById('btnToggleAudio').querySelector('span:last-child').textContent = appState.audioEnabled ? ' Sonido Activado' : ' Sonido Silenciado';
-  });
+  // Controles de cámara estándar (compatibilidad)
+  const btnToggleCamera = document.getElementById('btnToggleCamera');
+  if (btnToggleCamera) {
+    btnToggleCamera.addEventListener('click', () => {
+      if (appState.isScanning) {
+        stopCamera();
+      } else {
+        startCamera();
+      }
+    });
+  }
+
+  const btnSwitchCamera = document.getElementById('btnSwitchCamera');
+  if (btnSwitchCamera) {
+    btnSwitchCamera.addEventListener('click', switchCamera);
+  }
+
+  const btnToggleAudio = document.getElementById('btnToggleAudio');
+  if (btnToggleAudio) {
+    btnToggleAudio.addEventListener('click', () => {
+      appState.audioEnabled = !appState.audioEnabled;
+      const audioIcon = document.getElementById('audioIcon');
+      if (audioIcon) audioIcon.textContent = appState.audioEnabled ? '🔊' : '🔇';
+      const hudIcon = document.getElementById('hudAudioIcon');
+      if (hudIcon) hudIcon.textContent = appState.audioEnabled ? '🔊' : '🔇';
+    });
+  }
 
   // Filtros de búsqueda en tabla
   document.getElementById('attendeesSearchInput').addEventListener('input', renderAttendeesTable);
   document.getElementById('filterStatusSelect').addEventListener('change', renderAttendeesTable);
+  const filterSellerSelect = document.getElementById('filterSellerSelect');
+  if (filterSellerSelect) {
+    filterSellerSelect.addEventListener('change', renderAttendeesTable);
+  }
 
   // Cambio dinámico de símbolo de moneda en el editor de tipos de entrada
   document.getElementById('setEventCurrency').addEventListener('input', () => {
@@ -824,6 +1443,27 @@ function setupEventListeners() {
       return;
     }
 
+    const pinInput = document.getElementById('setGatekeeperPin');
+    const pinVal = pinInput ? pinInput.value.trim() : '';
+    if (pinVal && !/^\d{4}$/.test(pinVal)) {
+      showActionAlertModal('⚠️', 'PIN Inválido', 'El PIN de portería debe tener exactamente 4 cifras numéricas (ej: 1234).');
+      return;
+    }
+
+    const sellerPinInput = document.getElementById('setSellerPin');
+    const sellerPinVal = sellerPinInput ? sellerPinInput.value.trim() : '';
+    if (sellerPinVal && !/^\d{4}$/.test(sellerPinVal)) {
+      showActionAlertModal('⚠️', 'PIN Inválido', 'El PIN de ventas debe tener exactamente 4 cifras numéricas (ej: 4321).');
+      return;
+    }
+
+    const passInput = document.getElementById('setAdminPassword');
+    const passVal = passInput ? passInput.value.trim() : '';
+    if (passVal && passVal.length < 4) {
+      showActionAlertModal('⚠️', 'Contraseña Corta', 'La contraseña de administrador debe tener al menos 4 caracteres.');
+      return;
+    }
+
     const updated = {
       name: document.getElementById('setEventName').value.trim(),
       subtitle: document.getElementById('setEventSubtitle').value.trim(),
@@ -833,6 +1473,10 @@ function setupEventListeners() {
       currency: document.getElementById('setEventCurrency').value.trim() || '$',
       ticketTypes: validTypes
     };
+
+    if (pinVal) updated.gatekeeperPin = pinVal;
+    if (sellerPinVal) updated.sellerPin = sellerPinVal;
+    if (passVal) updated.adminPassword = passVal;
 
     try {
       const res = await fetch('/api/event', {
@@ -845,7 +1489,7 @@ function setupEventListeners() {
         appState.event = data.event;
         renderEventInfo();
         populateTicketTypeSelect();
-        showActionAlertModal('💾', 'Configuración Guardada', '¡La configuración del evento y los tipos de entrada han sido guardados con éxito!');
+        showActionAlertModal('💾', 'Configuración Guardada', '¡La configuración del evento, tipos de entrada y claves de seguridad han sido guardadas con éxito!');
         switchTab('dashboard');
       } else {
         showActionAlertModal('⚠️', 'Error al Guardar', data.error || 'Error al guardar la configuración.');
@@ -1060,6 +1704,19 @@ function populateSettingsForm() {
   document.getElementById('setEventLocation').value = ev.location || '';
   document.getElementById('setEventCapacity').value = ev.capacity || 300;
   document.getElementById('setEventCurrency').value = ev.currency || '$';
+
+  const gatekeeperPinInput = document.getElementById('setGatekeeperPin');
+  if (gatekeeperPinInput) {
+    gatekeeperPinInput.value = ev.gatekeeperPin || '1234';
+  }
+  const sellerPinInput = document.getElementById('setSellerPin');
+  if (sellerPinInput) {
+    sellerPinInput.value = ev.sellerPin || '4321';
+  }
+  const adminPasswordInput = document.getElementById('setAdminPassword');
+  if (adminPasswordInput) {
+    adminPasswordInput.value = '';
+  }
 
   // Copiar tipos de entrada actuales para edición
   if (Array.isArray(ev.ticketTypes) && ev.ticketTypes.length > 0) {
@@ -1467,4 +2124,581 @@ function printCleanTicket(elementId = 'printableTicketCard') {
   `);
   doc.close();
 }
+
+// ============================================================================
+// 8. PUNTO DE VENTA EXPRESS (POS) & CAJA DE VENDEDORES
+// ============================================================================
+function renderPosCatalog() {
+  const container = document.getElementById('posTicketTypesGrid');
+  if (!container) return;
+
+  const ev = appState.event || {};
+  const currency = ev.currency || '$';
+  const posEventEl = document.getElementById('posEventName');
+  if (posEventEl) posEventEl.textContent = ev.name || 'Mi Gran Evento';
+  const posPrefixEl = document.getElementById('posCurrencyPrefix');
+  if (posPrefixEl) posPrefixEl.textContent = currency;
+  const sellerPillEl = document.getElementById('posCurrentSellerName');
+  if (sellerPillEl) sellerPillEl.textContent = appState.sellerName || 'Taquilla 1';
+
+  // Available seats
+  const activeCount = appState.tickets.filter(t => t.status !== 'cancelled').length;
+  const capacity = ev.capacity || 0;
+  const remaining = Math.max(0, capacity - activeCount);
+  const seatsEl = document.getElementById('posAvailableSeats');
+  if (seatsEl) {
+    seatsEl.textContent = capacity > 0 ? `${remaining} cupos` : 'Ilimitado';
+    seatsEl.style.color = remaining <= 10 && capacity > 0 ? '#f87171' : '#34d399';
+  }
+
+  const types = (ev.ticketTypes && ev.ticketTypes.length > 0) ? ev.ticketTypes : [
+    { id: 'general', name: 'General', price: 50 },
+    { id: 'vip', name: 'VIP', price: 100 }
+  ];
+
+  container.innerHTML = types.map(t => {
+    const qty = appState.posCart[t.id] || 0;
+    const inCartClass = qty > 0 ? 'in-cart' : '';
+    return `
+      <div class="pos-ticket-card ${inCartClass}" id="posCard-${t.id}">
+        <div>
+          <div class="pos-ticket-name">${escapeHtml(t.name)}</div>
+          <div class="pos-ticket-price">${currency}${t.price}</div>
+        </div>
+        <div class="pos-card-qty-controls">
+          <button type="button" class="pos-qty-btn" onclick="removeTicketFromPos('${t.id}')" title="Quitar 1">-</button>
+          <span class="pos-qty-display" id="posCardQty-${t.id}">${qty}</span>
+          <button type="button" class="pos-qty-btn" onclick="addTicketToPos('${t.id}')" title="Agregar 1">+</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function addTicketToPos(typeId) {
+  sounds.playSuccess();
+  appState.posCart[typeId] = (appState.posCart[typeId] || 0) + 1;
+  updatePosCartUI();
+  const card = document.getElementById(`posCard-${typeId}`);
+  if (card) {
+    card.classList.add('in-cart');
+    const qtyEl = document.getElementById(`posCardQty-${typeId}`);
+    if (qtyEl) qtyEl.textContent = appState.posCart[typeId];
+  }
+}
+
+function removeTicketFromPos(typeId) {
+  if (!appState.posCart[typeId]) return;
+  appState.posCart[typeId] -= 1;
+  if (appState.posCart[typeId] <= 0) {
+    delete appState.posCart[typeId];
+  }
+  updatePosCartUI();
+  const card = document.getElementById(`posCard-${typeId}`);
+  if (card) {
+    const qty = appState.posCart[typeId] || 0;
+    if (qty === 0) card.classList.remove('in-cart');
+    const qtyEl = document.getElementById(`posCardQty-${typeId}`);
+    if (qtyEl) qtyEl.textContent = qty;
+  }
+}
+
+function clearPosCart() {
+  appState.posCart = {};
+  updatePosCartUI();
+  renderPosCatalog();
+}
+
+function updatePosCartUI() {
+  const container = document.getElementById('posOrderItemsList');
+  if (!container) return;
+
+  const ev = appState.event || {};
+  const currency = ev.currency || '$';
+  const types = ev.ticketTypes || [];
+  const entries = Object.entries(appState.posCart);
+
+  if (entries.length === 0) {
+    container.innerHTML = `
+      <div class="pos-empty-cart">
+        <span>🛒</span>
+        <p>Selecciona una o más entradas a la izquierda para comenzar la venta</p>
+      </div>
+    `;
+    const grandDisp = document.getElementById('posGrandTotalDisplay');
+    if (grandDisp) grandDisp.textContent = `${currency}0`;
+    const countDisp = document.getElementById('posTotalTicketsCount');
+    if (countDisp) countDisp.textContent = '0';
+    calculatePosChange();
+    return;
+  }
+
+  let grandTotal = 0;
+  let totalTickets = 0;
+
+  let html = '';
+  entries.forEach(([typeId, qty]) => {
+    const ticketType = types.find(t => t.id === typeId) || { name: 'Entrada', price: 0 };
+    const lineTotal = (ticketType.price || 0) * qty;
+    grandTotal += lineTotal;
+    totalTickets += qty;
+
+    html += `
+      <div class="pos-order-item">
+        <div class="pos-item-info">
+          <span class="pos-item-qty-tag">x${qty}</span>
+          <strong>${escapeHtml(ticketType.name)}</strong>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+          <span class="pos-item-total">${currency}${lineTotal.toLocaleString()}</span>
+          <button type="button" class="btn-text-danger" onclick="removeTicketFromPos('${typeId}')" title="Quitar uno" style="font-size: 1rem; padding: 0.1rem 0.35rem;">✕</button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+  const grandDisp = document.getElementById('posGrandTotalDisplay');
+  if (grandDisp) grandDisp.textContent = `${currency}${grandTotal.toLocaleString()}`;
+  const countDisp = document.getElementById('posTotalTicketsCount');
+  if (countDisp) countDisp.textContent = totalTickets;
+
+  calculatePosChange();
+}
+
+function togglePosBuyerFields(isCustom) {
+  const wrap = document.getElementById('posCustomBuyerFields');
+  const optBearer = document.getElementById('togglePosBearer');
+  const optCustom = document.getElementById('togglePosCustom');
+
+  appState.posBuyerType = isCustom ? 'custom' : 'bearer';
+  if (wrap) wrap.style.display = isCustom ? 'flex' : 'none';
+  if (optBearer) optBearer.classList.toggle('active', !isCustom);
+  if (optCustom) optCustom.classList.toggle('active', isCustom);
+
+  if (isCustom) {
+    setTimeout(() => {
+      const inp = document.getElementById('posBuyerName');
+      if (inp) inp.focus();
+    }, 50);
+  }
+}
+
+function selectPosPaymentMethod(method) {
+  appState.posPaymentMethod = method;
+  document.querySelectorAll('.payment-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.getAttribute('data-method') === method);
+  });
+
+  const calcBox = document.getElementById('posCashCalculatorBox');
+  if (calcBox) {
+    calcBox.style.display = method === 'Efectivo' ? 'block' : 'none';
+  }
+  calculatePosChange();
+}
+
+function calculatePosChange() {
+  if (appState.posPaymentMethod !== 'Efectivo') return;
+
+  const ev = appState.event || {};
+  const currency = ev.currency || '$';
+  const types = ev.ticketTypes || [];
+
+  let grandTotal = 0;
+  Object.entries(appState.posCart).forEach(([typeId, qty]) => {
+    const t = types.find(x => x.id === typeId) || { price: 0 };
+    grandTotal += (t.price || 0) * qty;
+  });
+
+  const cashInp = document.getElementById('posCashReceivedInput');
+  const cashVal = parseFloat(cashInp ? cashInp.value : 0) || 0;
+  const changeBox = document.getElementById('posChangeBox');
+  const changeAmt = document.getElementById('posChangeAmount');
+
+  if (!changeBox || !changeAmt) return;
+
+  if (cashVal === 0 && grandTotal > 0) {
+    changeBox.className = 'change-display-box';
+    changeAmt.textContent = `${currency}0`;
+    return;
+  }
+
+  const diff = cashVal - grandTotal;
+  if (diff >= 0) {
+    changeBox.className = 'change-display-box';
+    changeAmt.textContent = `${currency}${diff.toLocaleString()}`;
+  } else {
+    changeBox.className = 'change-display-box short';
+    changeAmt.textContent = `Faltan: ${currency}${Math.abs(diff).toLocaleString()}`;
+  }
+}
+
+function addQuickCash(amount) {
+  const cashInp = document.getElementById('posCashReceivedInput');
+  if (!cashInp) return;
+  const current = parseFloat(cashInp.value) || 0;
+  cashInp.value = current + amount;
+  calculatePosChange();
+}
+
+function setExactCash() {
+  const ev = appState.event || {};
+  const types = ev.ticketTypes || [];
+  let grandTotal = 0;
+  Object.entries(appState.posCart).forEach(([typeId, qty]) => {
+    const t = types.find(x => x.id === typeId) || { price: 0 };
+    grandTotal += (t.price || 0) * qty;
+  });
+
+  const cashInp = document.getElementById('posCashReceivedInput');
+  if (cashInp) {
+    cashInp.value = grandTotal;
+    calculatePosChange();
+  }
+}
+
+async function submitPosSale() {
+  const entries = Object.entries(appState.posCart);
+  if (entries.length === 0) {
+    showActionAlertModal('🛒', 'Orden Vacía', 'Selecciona al menos una entrada para cobrar.');
+    return;
+  }
+
+  const ev = appState.event || {};
+  const types = ev.ticketTypes || [];
+  const currency = ev.currency || '$';
+
+  let grandTotal = 0;
+  let totalCount = 0;
+  entries.forEach(([typeId, qty]) => {
+    const t = types.find(x => x.id === typeId) || { price: 0 };
+    grandTotal += (t.price || 0) * qty;
+    totalCount += qty;
+  });
+
+  const cashInp = document.getElementById('posCashReceivedInput');
+  const cashVal = parseFloat(cashInp ? cashInp.value : 0) || 0;
+  if (appState.posPaymentMethod === 'Efectivo' && cashVal > 0 && cashVal < grandTotal) {
+    showActionAlertModal('💵', 'Efectivo Insuficiente', `El efectivo recibido (${currency}${cashVal}) es menor al total a cobrar (${currency}${grandTotal}).`);
+    return;
+  }
+
+  const isCustom = appState.posBuyerType === 'custom';
+  const buyerName = isCustom ? (document.getElementById('posBuyerName').value || '').trim() : '';
+  const buyerPhone = isCustom ? (document.getElementById('posBuyerPhone').value || '').trim() : '';
+  const buyerDni = isCustom ? (document.getElementById('posBuyerDni').value || '').trim() : '';
+  const seller = appState.sellerName || 'Taquilla 1';
+
+  const btnSubmit = document.getElementById('btnPosSubmitOrder');
+  btnSubmit.disabled = true;
+  btnSubmit.innerHTML = '<span>⏳</span> Procesando Venta...';
+
+  const createdTicketsList = [];
+
+  try {
+    for (const [typeId, qty] of entries) {
+      const t = types.find(x => x.id === typeId) || { name: 'General', price: 0 };
+      const res = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attendeeName: buyerName,
+          attendeePhone: buyerPhone,
+          attendeeDni: buyerDni,
+          type: t.name,
+          price: t.price,
+          paymentMethod: appState.posPaymentMethod,
+          quantity: qty,
+          soldBy: seller
+        })
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Error al generar boletos');
+      }
+      if (Array.isArray(data.tickets)) {
+        createdTicketsList.push(...data.tickets);
+      } else if (data.ticket) {
+        createdTicketsList.push(data.ticket);
+      }
+    }
+
+    sounds.playSuccess();
+    appState.lastSoldTickets = createdTicketsList;
+
+    // Resetear formulario POS
+    clearPosCart();
+    if (cashInp) cashInp.value = '';
+    if (isCustom) {
+      document.getElementById('posBuyerName').value = '';
+      document.getElementById('posBuyerPhone').value = '';
+      document.getElementById('posBuyerDni').value = '';
+      togglePosBuyerFields(false);
+    }
+
+    // Mostrar modal de éxito
+    openPosSuccessModal(createdTicketsList, grandTotal, cashVal);
+
+  } catch (err) {
+    sounds.playWarning();
+    showActionAlertModal('🛑', 'Error en la Venta', err.message || 'No se pudo completar la venta.');
+  } finally {
+    btnSubmit.disabled = false;
+    btnSubmit.innerHTML = '<span>🎟️</span> Cobrar y Generar Boletos';
+  }
+}
+
+function openPosSuccessModal(tickets, totalPaid, cashReceived) {
+  if (!tickets || tickets.length === 0) return;
+  const firstTicket = tickets[0];
+  const ev = appState.event || {};
+  const currency = ev.currency || '$';
+
+  document.getElementById('posSuccessCountText').textContent = tickets.length === 1 
+    ? `1 Entrada (${firstTicket.type})` 
+    : `${tickets.length} Entradas (${firstTicket.type})`;
+
+  document.getElementById('posSuccessAttendeeName').textContent = firstTicket.attendeeName || 'Al Portador';
+  document.getElementById('posSuccessTotalPaid').textContent = `${currency}${totalPaid.toLocaleString()} (${firstTicket.paymentMethod})`;
+  document.getElementById('posSuccessFolio').textContent = firstTicket.id + (tickets.length > 1 ? ` (+${tickets.length - 1} más)` : '');
+
+  // Cambio
+  const changeRow = document.getElementById('posSuccessChangeRow');
+  if (cashReceived > totalPaid && firstTicket.paymentMethod === 'Efectivo') {
+    changeRow.style.display = 'flex';
+    document.getElementById('posSuccessChangeText').textContent = `${currency}${(cashReceived - totalPaid).toLocaleString()}`;
+  } else {
+    changeRow.style.display = 'none';
+  }
+
+  // Pre-fill WhatsApp si tenía teléfono
+  const phoneInp = document.getElementById('posSuccessPhoneInput');
+  if (phoneInp) {
+    phoneInp.value = firstTicket.attendeePhone || '';
+  }
+
+  document.getElementById('posSuccessModal').classList.add('open');
+}
+
+function closePosSuccessModal() {
+  document.getElementById('posSuccessModal').classList.remove('open');
+}
+
+function sendPosTicketWhatsApp() {
+  if (!appState.lastSoldTickets || appState.lastSoldTickets.length === 0) return;
+  const firstTicket = appState.lastSoldTickets[0];
+  const ev = appState.event || {};
+  const phoneInp = document.getElementById('posSuccessPhoneInput');
+  const phone = (phoneInp ? phoneInp.value : firstTicket.attendeePhone || '').replace(/[^0-9]/g, '');
+
+  const url = `${window.location.origin}/ticket.html?id=${firstTicket.id}`;
+  const count = appState.lastSoldTickets.length;
+  const countText = count > 1 ? ` (${count} boletos emitidos)` : '';
+
+  const msg = `¡Hola ${firstTicket.attendeeName}! 👋 Aquí tienes tu entrada oficial para *${ev.name || 'el evento'}*${countText}:\n\n🎟️ Folio: *${firstTicket.id}*\n🎫 Tipo: *${firstTicket.type}*\n🔗 Accede a tu boleto digital con código QR aquí:\n${url}\n\n*Presenta este código en la entrada el día del evento.* ¡Te esperamos!`;
+
+  let waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+  if (phone) {
+    waUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
+  }
+  window.open(waUrl, '_blank');
+}
+
+function printPosThermalReceipt() {
+  if (!appState.lastSoldTickets || appState.lastSoldTickets.length === 0) return;
+  const firstTicket = appState.lastSoldTickets[0];
+  const ev = appState.event || {};
+  const currency = ev.currency || '$';
+
+  document.getElementById('receiptEventName').textContent = ev.name || 'Mi Gran Evento';
+  document.getElementById('receiptEventSubtitle').textContent = ev.subtitle || '';
+  document.getElementById('receiptDate').textContent = ev.date ? new Date(ev.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Fecha por definir';
+  document.getElementById('receiptLocation').textContent = ev.location || 'Recinto';
+
+  document.getElementById('receiptQrImage').src = firstTicket.qrDataUrl;
+  document.getElementById('receiptFolio').textContent = firstTicket.id;
+  document.getElementById('receiptTicketType').textContent = `ENTRADA ${firstTicket.type.toUpperCase()}`;
+
+  document.getElementById('receiptAttendee').textContent = firstTicket.attendeeName;
+  if (firstTicket.attendeeDni) {
+    document.getElementById('receiptDniRow').style.display = 'flex';
+    document.getElementById('receiptDni').textContent = firstTicket.attendeeDni;
+  } else {
+    document.getElementById('receiptDniRow').style.display = 'none';
+  }
+
+  const count = appState.lastSoldTickets.length;
+  const totalPrice = appState.lastSoldTickets.reduce((sum, t) => sum + (t.price || 0), 0);
+  document.getElementById('receiptPrice').textContent = count > 1 ? `${currency}${totalPrice} (${count} boletos)` : `${currency}${firstTicket.price}`;
+  document.getElementById('receiptPayment').textContent = firstTicket.paymentMethod || 'Efectivo';
+  document.getElementById('receiptSeller').textContent = firstTicket.soldBy || appState.sellerName || 'Taquilla';
+  document.getElementById('receiptTime').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  window.print();
+}
+
+function copyPosTicketLink() {
+  if (!appState.lastSoldTickets || appState.lastSoldTickets.length === 0) return;
+  const firstTicket = appState.lastSoldTickets[0];
+  const url = `${window.location.origin}/ticket.html?id=${firstTicket.id}`;
+  navigator.clipboard.writeText(url).then(() => {
+    showActionAlertModal('🔗', 'Enlace Copiado', `El enlace público del boleto digital ha sido copiado.`);
+  });
+}
+
+// ============================================================================
+// 9. CORTE DE CAJA DEL TURNO (MI CAJA)
+// ============================================================================
+function renderSellerShiftBox() {
+  const seller = appState.sellerName || 'Taquilla 1';
+  const ev = appState.event || {};
+  const currency = ev.currency || '$';
+
+  const sellerBoxEl = document.getElementById('sellerBoxName');
+  if (sellerBoxEl) sellerBoxEl.textContent = seller;
+  const sellerDateEl = document.getElementById('sellerBoxDateTime');
+  if (sellerDateEl) {
+    sellerDateEl.textContent = new Date().toLocaleDateString([], { dateStyle: 'full' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Filtrar boletos vendidos por este vendedor
+  const myTickets = appState.tickets.filter(t => (t.soldBy || 'Administración') === seller);
+
+  let cashTotal = 0;
+  let digitalTotal = 0;
+  let cardTotal = 0;
+  let grandTotal = 0;
+
+  myTickets.forEach(t => {
+    if (t.status === 'cancelled') return;
+    const p = t.price || 0;
+    grandTotal += p;
+    const method = (t.paymentMethod || '').toLowerCase();
+    if (method.includes('efectivo')) {
+      cashTotal += p;
+    } else if (method.includes('tarjeta')) {
+      cardTotal += p;
+    } else if (method.includes('cortesía') || method.includes('gratuito')) {
+      // 0
+    } else {
+      digitalTotal += p;
+    }
+  });
+
+  const kpiCash = document.getElementById('sellerKpiCash');
+  if (kpiCash) kpiCash.textContent = `${currency}${cashTotal.toLocaleString()}`;
+  const kpiDig = document.getElementById('sellerKpiDigital');
+  if (kpiDig) kpiDig.textContent = `${currency}${digitalTotal.toLocaleString()}`;
+  const kpiCard = document.getElementById('sellerKpiCard');
+  if (kpiCard) kpiCard.textContent = `${currency}${cardTotal.toLocaleString()}`;
+  const kpiTot = document.getElementById('sellerKpiTotal');
+  if (kpiTot) kpiTot.textContent = `${currency}${grandTotal.toLocaleString()}`;
+  const kpiTkts = document.getElementById('sellerKpiTickets');
+  if (kpiTkts) kpiTkts.textContent = myTickets.length;
+  const recentCountEl = document.getElementById('sellerRecentCount');
+  if (recentCountEl) recentCountEl.textContent = `${myTickets.length} boletos emitidos por ${seller}`;
+
+  const tbody = document.getElementById('sellerTicketsTableBody');
+  if (!tbody) return;
+
+  if (myTickets.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+          Aún no has realizado ventas en este turno. Abre el Punto de Venta para comenzar.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = myTickets.map(t => {
+    const time = new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `
+      <tr>
+        <td style="font-family: monospace; font-weight: 700; color: #38bdf8;">${t.id}</td>
+        <td style="font-weight: 600;">${escapeHtml(t.attendeeName)}</td>
+        <td>${escapeHtml(t.type)}</td>
+        <td style="color: #34d399; font-weight: 700;">${currency}${t.price}</td>
+        <td style="font-size: 0.82rem; color: var(--text-secondary);">${escapeHtml(t.paymentMethod || 'Efectivo')}</td>
+        <td style="font-size: 0.85rem;">${time}</td>
+        <td style="text-align: right;">
+          <div style="display: inline-flex; gap: 0.35rem;">
+            <button class="btn btn-secondary btn-sm" onclick="openTicketModal('${t.id}')" title="Ver Boleto">
+              🎟️
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="printSingleTicketReceipt('${t.id}')" title="Imprimir Recibo">
+              🖨️
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function printSingleTicketReceipt(ticketId) {
+  const ticket = appState.tickets.find(t => t.id === ticketId);
+  if (!ticket) return;
+  appState.lastSoldTickets = [ticket];
+  printPosThermalReceipt();
+}
+
+function printShiftClosingReport() {
+  const seller = appState.sellerName || 'Taquilla 1';
+  const ev = appState.event || {};
+  const currency = ev.currency || '$';
+
+  const myTickets = appState.tickets.filter(t => (t.soldBy || 'Administración') === seller);
+
+  let cashTotal = 0;
+  let digitalTotal = 0;
+  let cardTotal = 0;
+  let grandTotal = 0;
+
+  myTickets.forEach(t => {
+    if (t.status === 'cancelled') return;
+    const p = t.price || 0;
+    grandTotal += p;
+    const method = (t.paymentMethod || '').toLowerCase();
+    if (method.includes('efectivo')) {
+      cashTotal += p;
+    } else if (method.includes('tarjeta')) {
+      cardTotal += p;
+    } else if (!method.includes('cortesía')) {
+      digitalTotal += p;
+    }
+  });
+
+  document.getElementById('shiftReceiptEvent').textContent = ev.name || 'Mi Gran Evento';
+  document.getElementById('shiftReceiptSeller').textContent = seller;
+  document.getElementById('shiftReceiptDate').textContent = new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+  document.getElementById('shiftReceiptCount').textContent = `${myTickets.length} entradas emitidas`;
+
+  document.getElementById('shiftReceiptCash').textContent = `${currency}${cashTotal.toLocaleString()}`;
+  document.getElementById('shiftReceiptDigital').textContent = `${currency}${digitalTotal.toLocaleString()}`;
+  document.getElementById('shiftReceiptCard').textContent = `${currency}${cardTotal.toLocaleString()}`;
+  document.getElementById('shiftReceiptTotal').textContent = `${currency}${grandTotal.toLocaleString()}`;
+
+  window.print();
+}
+
+// Global exposure for inline HTML callbacks in POS & Seller Box
+window.addTicketToPos = addTicketToPos;
+window.removeTicketFromPos = removeTicketFromPos;
+window.clearPosCart = clearPosCart;
+window.togglePosBuyerFields = togglePosBuyerFields;
+window.selectPosPaymentMethod = selectPosPaymentMethod;
+window.calculatePosChange = calculatePosChange;
+window.addQuickCash = addQuickCash;
+window.setExactCash = setExactCash;
+window.submitPosSale = submitPosSale;
+window.closePosSuccessModal = closePosSuccessModal;
+window.sendPosTicketWhatsApp = sendPosTicketWhatsApp;
+window.printPosThermalReceipt = printPosThermalReceipt;
+window.copyPosTicketLink = copyPosTicketLink;
+window.printShiftClosingReport = printShiftClosingReport;
+window.printSingleTicketReceipt = printSingleTicketReceipt;
+window.switchTab = switchTab;
 
