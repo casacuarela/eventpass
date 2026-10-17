@@ -5,6 +5,9 @@
   "location": "Auditorio Principal / Recinto del Evento",
   "capacity": 300,
   "currency": "$",
+  "gatekeeperPin": "1234",
+  "sellerPin": "4321",
+  "adminPassword": "admin123",
   "ticketTypes": [
     {
       "id": "general",
@@ -25,6 +28,15 @@
       "id": "cortesia",
       "name": "Cortesía",
       "price": 0
+    }
+  ],
+  "sellers": [
+    {
+      "id": "seller-1",
+      "name": "Taquilla 1",
+      "pin": "4321",
+      "active": true,
+      "createdAt": "2026-10-17T17:26:48.217Z"
     }
   ]
 }
