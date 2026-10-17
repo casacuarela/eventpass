@@ -8,9 +8,11 @@ let appState = {
   event: null,
   tickets: [],
   stats: {},
+  sellers: [],
   activeTab: 'dashboard',
   userRole: null, // 'gatekeeper', 'seller' or 'admin'
   sellerName: 'Taquilla 1',
+  sellerId: null,
   posCart: {},
   posPaymentMethod: 'Efectivo',
   posBuyerType: 'bearer',
@@ -506,28 +508,51 @@ function switchTab(tabName) {
 
   // Actualizar migas de pan / título de vista en la topbar
   const topbarTitle = document.getElementById('topbarCurrentViewTitle');
+  const mobileTabTag = document.getElementById('mobileCurrentTabTag');
+  const titles = {
+    dashboard: 'Dashboard',
+    pos: 'Punto de Venta',
+    sell: 'Emitir Entrada',
+    attendees: 'Asistentes',
+    sellers: 'Gestión de Vendedores',
+    scanner: 'Escáner Portería',
+    'seller-box': 'Corte de Caja',
+    settings: 'Ajustes del Evento'
+  };
+  const shortTitles = {
+    dashboard: 'Dashboard',
+    pos: 'Vender',
+    sell: 'Emitir',
+    attendees: 'Boletos',
+    sellers: 'Vendedores',
+    scanner: 'Escáner',
+    'seller-box': 'Mi Caja',
+    settings: 'Ajustes'
+  };
   if (topbarTitle) {
-    const titles = {
-      dashboard: 'Dashboard',
-      pos: 'Punto de Venta',
-      sell: 'Emitir Entrada',
-      attendees: 'Asistentes',
-      scanner: 'Escáner Portería',
-      'seller-box': 'Corte de Caja',
-      settings: 'Ajustes del Evento'
-    };
     topbarTitle.textContent = titles[tabName] || tabName;
   }
+  if (mobileTabTag) {
+    mobileTabTag.textContent = shortTitles[tabName] || tabName;
+  }
 
-  // Cerrar menú móvil automáticamente al navegar
+  // Desplazar al inicio suavemente en móvil
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Cerrar menú móvil y bottom sheet automáticamente al navegar
   toggleMobileSidebar(false);
   toggleUserDropdown(false);
+  closeBottomSheet();
 
   if (tabName === 'pos') {
     renderPosCatalog();
     updatePosCartUI();
   } else if (tabName === 'seller-box') {
     renderSellerShiftBox();
+  } else if (tabName === 'sellers') {
+    fetchSellers();
+  } else if (tabName === 'dashboard') {
+    renderDashboardSellersRanking();
   }
 
   // Manejo especial de la cámara si se entra o sale de la pestaña de Scanner
@@ -572,6 +597,9 @@ async function loadInitialData() {
     renderAttendeesTable();
     populateTicketTypeSelect();
     populateSettingsForm();
+    await fetchSellers();
+    renderDashboardSellersRanking();
+    updateDockBadges();
   } catch (err) {
     console.error('Error al cargar datos:', err);
   }
@@ -583,8 +611,8 @@ function setupSSE() {
     const eventSource = new EventSource('/api/events/stream');
 
     eventSource.onopen = () => {
-      badge.className = 'badge badge-used';
-      badge.innerHTML = '<span style="font-size: 8px;">🟢</span> En Línea';
+      badge.className = 'topbar-sync-badge';
+      badge.innerHTML = '<span class="status-pulse-dot"></span> <span class="topbar-sync-text">En Línea</span>';
     };
 
     eventSource.onmessage = (event) => {
@@ -597,8 +625,8 @@ function setupSSE() {
     };
 
     eventSource.onerror = () => {
-      badge.className = 'badge badge-valid';
-      badge.innerHTML = '<span style="font-size: 8px;">🟠</span> Reconectando...';
+      badge.className = 'topbar-sync-badge reconnecting';
+      badge.innerHTML = '<span class="status-pulse-dot" style="background:#f59e0b;"></span> <span class="topbar-sync-text">Reconectando</span>';
     };
   } catch (e) {
     console.warn('SSE no disponible:', e);
@@ -615,6 +643,9 @@ function handleLiveEvent({ type, data }) {
     if (data.stats) appState.stats = data.stats;
     renderKPIs();
     renderAttendeesTable();
+    renderDashboardSellersRanking();
+    renderSellersView();
+    updateDockBadges();
     if (appState.activeTab === 'pos') renderPosCatalog();
     if (appState.activeTab === 'seller-box') renderSellerShiftBox();
   } else if (type === 'TICKET_SCANNED' || type === 'FRAUD_DETECTED' || type === 'TICKET_UPDATED') {
@@ -626,7 +657,12 @@ function handleLiveEvent({ type, data }) {
     if (data.stats) appState.stats = data.stats;
     renderKPIs();
     renderAttendeesTable();
+    renderDashboardSellersRanking();
+    renderSellersView();
+    updateDockBadges();
     if (appState.activeTab === 'seller-box') renderSellerShiftBox();
+  } else if (type === 'SELLERS_UPDATED') {
+    fetchSellers();
   } else if (type === 'EVENT_UPDATED') {
     appState.event = data;
     renderEventInfo();
@@ -839,6 +875,80 @@ function renderAttendeesTable() {
       </tr>
     `;
   }).join('');
+
+  // Renderizar Tarjetas Móviles Nativas (Anti-overflow en Celulares)
+  const cardsContainer = document.getElementById('attendeesCardsStream');
+  if (cardsContainer) {
+    if (filtered.length === 0) {
+      cardsContainer.innerHTML = `
+        <div style="text-align: center; padding: 2rem 1rem; color: var(--text-muted); font-size: 0.88rem;">
+          No se encontraron boletos que coincidan con la búsqueda.
+        </div>
+      `;
+    } else {
+      cardsContainer.innerHTML = filtered.map(t => {
+        let statusBadge = '';
+        if (t.status === 'valid') {
+          statusBadge = '<span class="badge badge-valid">⏳ Por Ingresar</span>';
+        } else if (t.status === 'used') {
+          statusBadge = '<span class="badge badge-used">✅ Ingresado</span>';
+        } else {
+          statusBadge = '<span class="badge badge-cancelled">🛑 Cancelado</span>';
+        }
+        const hasTransfers = t.transferHistory && t.transferHistory.length > 0;
+        const transferBadge = hasTransfers 
+          ? `<span class="badge badge-vip" style="font-size: 0.65rem;">🔄 Transferido</span>`
+          : '';
+        const vendedorNombre = t.soldBy || 'Administración';
+        const cleanPhone = t.attendeePhone ? t.attendeePhone.replace(/[^0-9+]/g, '') : '';
+        const waMsg = encodeURIComponent(`Hola ${t.attendeeName}, aquí tienes tu boleto digital oficial para ${appState.event ? appState.event.name : 'el evento'}: ${window.location.origin}/ticket.html?id=${t.id}`);
+
+        return `
+          <div class="attendee-mobile-card">
+            <div class="attendee-card-top">
+              <span class="attendee-card-folio">${t.id}</span>
+              ${statusBadge}
+              <span class="attendee-card-price">${currency}${t.price}</span>
+            </div>
+            <div class="attendee-card-main">
+              <div class="attendee-card-name">${escapeHtml(t.attendeeName)} ${transferBadge}</div>
+              <div class="attendee-card-meta">
+                <span>🏷️ ${escapeHtml(t.type)}</span>
+                <span>💳 ${escapeHtml(t.paymentMethod || 'Efectivo')}</span>
+              </div>
+            </div>
+            <div class="attendee-card-seller">
+              <span>👤 Vendido por:</span>
+              <strong>${escapeHtml(vendedorNombre)}</strong>
+            </div>
+            <div class="attendee-card-actions">
+              <button class="btn btn-secondary btn-sm" onclick="openTicketModal('${t.id}')">
+                🎟️ QR
+              </button>
+              ${cleanPhone ? `
+                <a href="https://wa.me/${cleanPhone}?text=${waMsg}" target="_blank" class="btn btn-success btn-sm" style="text-decoration:none;">
+                  📱 WhatsApp
+                </a>
+              ` : ''}
+              ${t.status === 'valid' ? `
+                <button class="btn btn-secondary btn-sm" onclick="openTransferModal('${t.id}')">
+                  🔄 Transferir
+                </button>
+                <button class="btn btn-success btn-sm" onclick="manualValidate('${t.id}')">
+                  ✅ Ingreso
+                </button>
+              ` : ''}
+              ${t.status === 'used' ? `
+                <button class="btn btn-secondary btn-sm" onclick="revertTicket('${t.id}')">
+                  🔄 Reingreso
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
 }
 
 function escapeHtml(text) {
@@ -1200,7 +1310,8 @@ function setupEventListeners() {
           paymentMethod: paymentMethod,
           notes: notes,
           quantity: quantity,
-          soldBy: appState.userRole === 'seller' ? (appState.sellerName || 'Vendedor Taquilla') : 'Administración'
+          soldBy: appState.userRole === 'seller' ? (appState.sellerName || 'Vendedor Taquilla') : 'Administración',
+          sellerId: appState.userRole === 'seller' ? (appState.sellerId || null) : null
         })
       });
 
@@ -1301,10 +1412,13 @@ function setupEventListeners() {
     }
   });
 
-  // Control de Apertura / Cierre de Cajón Lateral en Móviles
+  // Control de Apertura / Cierre de Menú y Bottom Sheet en Móviles
   const mobileMenuBtn = document.getElementById('mobileMenuBtn');
   if (mobileMenuBtn) {
-    mobileMenuBtn.addEventListener('click', () => toggleMobileSidebar(true));
+    mobileMenuBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openBottomSheet();
+    });
   }
   const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
   if (sidebarCloseBtn) {
@@ -1316,7 +1430,95 @@ function setupEventListeners() {
   }
   const mobileNavMoreBtn = document.getElementById('mobileNavMoreBtn');
   if (mobileNavMoreBtn) {
-    mobileNavMoreBtn.addEventListener('click', () => toggleMobileSidebar(true));
+    mobileNavMoreBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openBottomSheet();
+    });
+  }
+
+  const closeBottomSheetBtn = document.getElementById('closeBottomSheetBtn');
+  if (closeBottomSheetBtn) {
+    closeBottomSheetBtn.addEventListener('click', closeBottomSheet);
+  }
+
+  const bottomSheetBackdrop = document.getElementById('bottomSheetBackdrop');
+  if (bottomSheetBackdrop) {
+    bottomSheetBackdrop.addEventListener('click', closeBottomSheet);
+  }
+
+  // Seller Modals Listeners
+  const btnOpenNewSellerModal = document.getElementById('btnOpenNewSellerModal');
+  if (btnOpenNewSellerModal) {
+    btnOpenNewSellerModal.addEventListener('click', openNewSellerModal);
+  }
+  const sellerCreateModalCloseBtn = document.getElementById('sellerCreateModalCloseBtn');
+  if (sellerCreateModalCloseBtn) {
+    sellerCreateModalCloseBtn.addEventListener('click', closeNewSellerModal);
+  }
+  const btnCancelCreateSeller = document.getElementById('btnCancelCreateSeller');
+  if (btnCancelCreateSeller) {
+    btnCancelCreateSeller.addEventListener('click', closeNewSellerModal);
+  }
+  const formCreateSeller = document.getElementById('formCreateSeller');
+  if (formCreateSeller) {
+    formCreateSeller.addEventListener('submit', handleCreateSellerForm);
+  }
+
+  const sellerEditPinModalCloseBtn = document.getElementById('sellerEditPinModalCloseBtn');
+  if (sellerEditPinModalCloseBtn) {
+    sellerEditPinModalCloseBtn.addEventListener('click', closeEditSellerPinModal);
+  }
+  const btnCancelEditSellerPin = document.getElementById('btnCancelEditSellerPin');
+  if (btnCancelEditSellerPin) {
+    btnCancelEditSellerPin.addEventListener('click', closeEditSellerPinModal);
+  }
+  const formEditSellerPin = document.getElementById('formEditSellerPin');
+  if (formEditSellerPin) {
+    formEditSellerPin.addEventListener('submit', handleEditSellerPinForm);
+  }
+
+  // Sheet Items Listeners
+  const sheetBtnSellers = document.getElementById('sheetBtnSellers');
+  if (sheetBtnSellers) {
+    sheetBtnSellers.addEventListener('click', () => {
+      closeBottomSheet();
+      switchTab('sellers');
+    });
+  }
+  const sheetBtnBox = document.getElementById('sheetBtnBox');
+  if (sheetBtnBox) {
+    sheetBtnBox.addEventListener('click', () => {
+      closeBottomSheet();
+      switchTab('seller-box');
+    });
+  }
+  const sheetBtnSellBatch = document.getElementById('sheetBtnSellBatch');
+  if (sheetBtnSellBatch) {
+    sheetBtnSellBatch.addEventListener('click', () => {
+      closeBottomSheet();
+      switchTab('sell');
+    });
+  }
+  const sheetBtnSettings = document.getElementById('sheetBtnSettings');
+  if (sheetBtnSettings) {
+    sheetBtnSettings.addEventListener('click', () => {
+      closeBottomSheet();
+      switchTab('settings');
+    });
+  }
+  const sheetBtnLogout = document.getElementById('sheetBtnLogout');
+  if (sheetBtnLogout) {
+    sheetBtnLogout.addEventListener('click', () => {
+      closeBottomSheet();
+      showAuthOverlay();
+    });
+  }
+  const sheetBtnSwitchUser = document.getElementById('sheetBtnSwitchUser');
+  if (sheetBtnSwitchUser) {
+    sheetBtnSwitchUser.addEventListener('click', () => {
+      closeBottomSheet();
+      showAuthOverlay();
+    });
   }
 
   // Formulario manual de scanner
@@ -2409,7 +2611,8 @@ async function submitPosSale() {
           price: t.price,
           paymentMethod: appState.posPaymentMethod,
           quantity: qty,
-          soldBy: seller
+          soldBy: seller,
+          sellerId: appState.sellerId || null
         })
       });
 
@@ -2701,4 +2904,415 @@ window.copyPosTicketLink = copyPosTicketLink;
 window.printShiftClosingReport = printShiftClosingReport;
 window.printSingleTicketReceipt = printSingleTicketReceipt;
 window.switchTab = switchTab;
+
+// ============================================================================
+// 12. GESTIÓN DE VENDEDORES & PROMOTORES (PRIVILEGIO ADMINISTRADOR)
+// ============================================================================
+async function fetchSellers() {
+  try {
+    const res = await fetch('/api/sellers');
+    if (res.ok) {
+      const data = await res.json();
+      appState.sellers = data.sellers || [];
+      renderSellersView();
+      renderDashboardSellersRanking();
+      updateSellersBadges();
+      populateSellerFilterOptions();
+    }
+  } catch (err) {
+    console.error("Error al obtener lista de vendedores:", err);
+  }
+}
+
+function updateSellersBadges() {
+  const count = (appState.sellers || []).length;
+  const sidebarBadge = document.getElementById('sidebarSellersBadge');
+  if (sidebarBadge) sidebarBadge.textContent = count;
+  const sheetBadge = document.getElementById('sheetSellersCountBadge');
+  if (sheetBadge) sheetBadge.textContent = count;
+}
+
+function updateDockBadges() {
+  const total = (appState.tickets || []).length;
+  const mobBadge = document.getElementById('mobAttendeeBadge');
+  if (mobBadge) mobBadge.textContent = total;
+  const tabCount = document.getElementById('tabCount');
+  if (tabCount) tabCount.textContent = total;
+  updateSellersBadges();
+}
+
+function populateSellerFilterOptions() {
+  const filterSellerEl = document.getElementById('filterSellerSelect');
+  if (!filterSellerEl) return;
+  const currentVal = filterSellerEl.value;
+
+  const sellerNames = new Set();
+  (appState.sellers || []).forEach(s => sellerNames.add(s.name));
+  (appState.tickets || []).forEach(t => {
+    if (t.soldBy) sellerNames.add(t.soldBy);
+  });
+
+  let optionsHtml = '<option value="all">Todos los vendedores</option>';
+  Array.from(sellerNames).sort().forEach(s => {
+    optionsHtml += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
+  });
+
+  filterSellerEl.innerHTML = optionsHtml;
+  filterSellerEl.value = currentVal || 'all';
+}
+
+function renderSellersView() {
+  const grid = document.getElementById('sellersCardsGrid');
+  const countTag = document.getElementById('sellersListCountTag');
+  const kpiCount = document.getElementById('kpiSellersCount');
+  const kpiTickets = document.getElementById('kpiSellersTickets');
+  const kpiRevenue = document.getElementById('kpiSellersRevenue');
+  const kpiCash = document.getElementById('kpiSellersCash');
+  const currency = (appState.event && appState.event.currency) || '$';
+
+  const sellers = appState.sellers || [];
+
+  let totalTickets = 0;
+  let totalRevenue = 0;
+  let totalCash = 0;
+
+  sellers.forEach(s => {
+    if (s.stats) {
+      totalTickets += s.stats.ticketsSold || 0;
+      totalRevenue += s.stats.totalRevenue || 0;
+      totalCash += s.stats.cashRevenue || 0;
+    }
+  });
+
+  if (kpiCount) kpiCount.textContent = sellers.filter(s => s.active).length;
+  if (kpiTickets) kpiTickets.textContent = totalTickets;
+  if (kpiRevenue) kpiRevenue.textContent = `${currency}${totalRevenue.toLocaleString()}`;
+  if (kpiCash) kpiCash.textContent = `${currency}${totalCash.toLocaleString()}`;
+  if (countTag) countTag.textContent = `${sellers.length} Vendedor${sellers.length === 1 ? '' : 'es'}`;
+
+  if (!grid) return;
+
+  if (sellers.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 3rem 1rem; color: var(--text-muted); background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px dashed rgba(255,255,255,0.1);">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">👥</div>
+        <h4 style="color: #fff; font-size: 1.1rem; margin-bottom: 0.25rem;">Aún no hay vendedores registrados</h4>
+        <p style="font-size: 0.85rem; max-width: 400px; margin: 0 auto 1.25rem;">Crea vendedores con su propio PIN de 4 cifras para que emitan boletos y registren sus ventas a su nombre.</p>
+        <button class="btn btn-primary" onclick="openNewSellerModal()">
+          <span>➕</span> Registrar Primer Vendedor
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = sellers.map(s => {
+    const st = s.stats || { ticketsSold: 0, totalRevenue: 0, cashRevenue: 0, digitalRevenue: 0 };
+    const initial = s.name ? s.name.charAt(0).toUpperCase() : 'V';
+    const activeBadge = s.active 
+      ? '<span class="badge badge-valid" style="font-size: 0.7rem;">● Activo</span>' 
+      : '<span class="badge badge-cancelled" style="font-size: 0.7rem;">● Inactivo</span>';
+
+    return `
+      <div class="seller-card" id="seller-card-${s.id}">
+        <div class="seller-card-top">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="seller-card-avatar">${initial}</div>
+            <div>
+              <div class="seller-card-name">${escapeHtml(s.name)}</div>
+              <div>${activeBadge}</div>
+            </div>
+          </div>
+          <div class="seller-card-pin-box" title="PIN de acceso">
+            <span>🔑</span>
+            <span id="pin-display-${s.id}">••••</span>
+            <button type="button" style="background:none; border:none; cursor:pointer; color:var(--text-muted); padding:2px;" onclick="togglePinVisibility('${s.id}', '${s.pin}')" title="Mostrar/Ocultar PIN">👁️</button>
+          </div>
+        </div>
+
+        <div class="seller-stats-strip">
+          <div class="seller-stat-item">
+            <span class="seller-stat-label">Boletos Vendidos</span>
+            <span class="seller-stat-val">${st.ticketsSold}</span>
+          </div>
+          <div class="seller-stat-item">
+            <span class="seller-stat-label">Total Recaudado</span>
+            <span class="seller-stat-val revenue">${currency}${st.totalRevenue.toLocaleString()}</span>
+          </div>
+          <div class="seller-stat-item">
+            <span class="seller-stat-label">Efectivo en Mano</span>
+            <span class="seller-stat-val" style="color: #fbbf24;">${currency}${st.cashRevenue.toLocaleString()}</span>
+          </div>
+          <div class="seller-stat-item">
+            <span class="seller-stat-label">Pagos Digitales</span>
+            <span class="seller-stat-val" style="color: #38bdf8;">${currency}${st.digitalRevenue.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div class="seller-card-actions">
+          <button class="btn btn-secondary btn-sm" onclick="openEditSellerPinModal('${s.id}', '${escapeHtml(s.name)}')">
+            <span>🔑</span> Cambiar PIN
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSeller('${s.id}', '${escapeHtml(s.name)}')">
+            <span>🗑️</span> Eliminar
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderDashboardSellersRanking() {
+  const container = document.getElementById('dashboardSellersRanking');
+  if (!container) return;
+
+  const currency = (appState.event && appState.event.currency) || '$';
+  const sellers = appState.sellers || [];
+
+  if (sellers.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 1.25rem; color: var(--text-muted); font-size: 0.85rem;">
+        No hay vendedores registrados todavía. Haz clic en "Administrar Vendedores" para crear el primero.
+      </div>
+    `;
+    return;
+  }
+
+  // Calculate max revenue for progress bar scaling
+  const maxRevenue = Math.max(...sellers.map(s => (s.stats ? s.stats.totalRevenue : 0)), 1);
+
+  // Sort descending by revenue
+  const sorted = [...sellers].sort((a, b) => ((b.stats ? b.stats.totalRevenue : 0) - (a.stats ? a.stats.totalRevenue : 0)));
+
+  container.innerHTML = sorted.map((s, idx) => {
+    const st = s.stats || { ticketsSold: 0, totalRevenue: 0, cashRevenue: 0, digitalRevenue: 0 };
+    const pct = Math.min(100, Math.round((st.totalRevenue / maxRevenue) * 100));
+    const medals = ['🥇', '🥈', '🥉'];
+    const rankIcon = medals[idx] || `👤`;
+
+    return `
+      <div class="seller-rank-row">
+        <div class="seller-rank-header">
+          <span class="seller-rank-name">
+            <span>${rankIcon}</span>
+            <span>${escapeHtml(s.name)}</span>
+            <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: normal;">(${st.ticketsSold} boletos)</span>
+          </span>
+          <span class="seller-rank-nums">${currency}${st.totalRevenue.toLocaleString()}</span>
+        </div>
+        <div class="seller-rank-bar-bg">
+          <div class="seller-rank-bar-fill" style="width: ${pct}%;"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function togglePinVisibility(sellerId, pin) {
+  const el = document.getElementById(`pin-display-${sellerId}`);
+  if (!el) return;
+  if (el.textContent === '••••') {
+    el.textContent = pin;
+    el.style.color = '#38bdf8';
+    el.style.fontWeight = 'bold';
+  } else {
+    el.textContent = '••••';
+    el.style.color = '';
+    el.style.fontWeight = '';
+  }
+}
+
+function openNewSellerModal() {
+  const modal = document.getElementById('sellerCreateModal');
+  const nameInput = document.getElementById('newSellerNameInput');
+  const pinInput = document.getElementById('newSellerPinInput');
+  const err = document.getElementById('newSellerErrorMsg');
+  if (err) err.textContent = '';
+  if (nameInput) nameInput.value = '';
+  if (pinInput) pinInput.value = '';
+  if (modal) modal.classList.add('active');
+  if (nameInput) setTimeout(() => nameInput.focus(), 150);
+}
+
+function closeNewSellerModal() {
+  const modal = document.getElementById('sellerCreateModal');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handleCreateSellerForm(e) {
+  e.preventDefault();
+  const nameInput = document.getElementById('newSellerNameInput');
+  const pinInput = document.getElementById('newSellerPinInput');
+  const err = document.getElementById('newSellerErrorMsg');
+
+  const name = (nameInput ? nameInput.value : '').trim();
+  const pin = (pinInput ? pinInput.value : '').trim();
+
+  if (!name) {
+    if (err) err.textContent = 'Ingresa el nombre del vendedor.';
+    return;
+  }
+  if (!/^\d{4}$/.test(pin)) {
+    if (err) err.textContent = 'El PIN debe tener exactamente 4 dígitos numéricos.';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/sellers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, pin })
+    });
+    const data = await res.json();
+    if (data.success) {
+      sounds.playSuccess();
+      closeNewSellerModal();
+      await fetchSellers();
+      showActionAlertModal('🎉', 'Vendedor Creado', `El vendedor <strong>${escapeHtml(name)}</strong> fue registrado con el PIN <code>${pin}</code>.`);
+    } else {
+      if (err) err.textContent = data.error || 'Error al guardar vendedor.';
+    }
+  } catch (e) {
+    if (err) err.textContent = 'Error de conexión con el servidor.';
+  }
+}
+
+function openEditSellerPinModal(sellerId, sellerName) {
+  const modal = document.getElementById('sellerEditPinModal');
+  const targetId = document.getElementById('editSellerTargetId');
+  const targetName = document.getElementById('editSellerTargetName');
+  const pinInput = document.getElementById('editSellerNewPinInput');
+  const err = document.getElementById('editSellerPinErrorMsg');
+
+  if (targetId) targetId.value = sellerId;
+  if (targetName) targetName.textContent = sellerName;
+  if (pinInput) pinInput.value = '';
+  if (err) err.textContent = '';
+
+  if (modal) modal.classList.add('active');
+  if (pinInput) setTimeout(() => pinInput.focus(), 150);
+}
+
+function closeEditSellerPinModal() {
+  const modal = document.getElementById('sellerEditPinModal');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handleEditSellerPinForm(e) {
+  e.preventDefault();
+  const targetId = document.getElementById('editSellerTargetId').value;
+  const pinInput = document.getElementById('editSellerNewPinInput');
+  const err = document.getElementById('editSellerPinErrorMsg');
+  const pin = (pinInput ? pinInput.value : '').trim();
+
+  if (!/^\d{4}$/.test(pin)) {
+    if (err) err.textContent = 'El PIN debe tener exactamente 4 dígitos numéricos.';
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/sellers/${targetId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin })
+    });
+    const data = await res.json();
+    if (data.success) {
+      sounds.playSuccess();
+      closeEditSellerPinModal();
+      await fetchSellers();
+      showActionAlertModal('🔑', 'PIN Actualizado', `El nuevo PIN de acceso fue asignado con éxito.`);
+    } else {
+      if (err) err.textContent = data.error || 'Error al actualizar PIN.';
+    }
+  } catch (e) {
+    if (err) err.textContent = 'Error de conexión con el servidor.';
+  }
+}
+
+async function deleteSeller(sellerId, sellerName) {
+  const confirmed = confirm(`¿Estás seguro de eliminar al vendedor "${sellerName}"? Sus ventas históricas se mantendrán intactas en la base de datos.`);
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`/api/sellers/${sellerId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      sounds.playSuccess();
+      await fetchSellers();
+      showActionAlertModal('🗑️', 'Vendedor Eliminado', `El vendedor <strong>${escapeHtml(sellerName)}</strong> fue removido.`);
+    } else {
+      alert(data.error || 'Error al eliminar vendedor.');
+    }
+  } catch (e) {
+    alert('Error de conexión con el servidor.');
+  }
+}
+
+// ============================================================================
+// 13. NATIVE MOBILE BOTTOM SHEET & APP DOCK CONTROLLERS
+// ============================================================================
+function openBottomSheet() {
+  const sheet = document.getElementById('moreBottomSheet');
+  const backdrop = document.getElementById('bottomSheetBackdrop');
+  if (sheet) sheet.classList.add('active');
+  if (backdrop) backdrop.classList.add('active');
+  updateBottomSheetContent();
+}
+
+function closeBottomSheet() {
+  const sheet = document.getElementById('moreBottomSheet');
+  const backdrop = document.getElementById('bottomSheetBackdrop');
+  if (sheet) sheet.classList.remove('active');
+  if (backdrop) backdrop.classList.remove('active');
+}
+
+function updateBottomSheetContent() {
+  const avatar = document.getElementById('sheetUserAvatar');
+  const name = document.getElementById('sheetUserName');
+  const roleText = document.getElementById('sheetUserRole');
+
+  const btnSellers = document.getElementById('sheetBtnSellers');
+  const btnSettings = document.getElementById('sheetBtnSettings');
+  const btnBox = document.getElementById('sheetBtnBox');
+
+  const role = appState.userRole || 'admin';
+  const sellerName = appState.sellerName || 'Taquilla 1';
+
+  if (role === 'admin') {
+    if (avatar) avatar.textContent = '👑';
+    if (name) name.textContent = 'Administrador';
+    if (roleText) roleText.textContent = 'Control Total Maestro';
+    if (btnSellers) btnSellers.style.display = 'flex';
+    if (btnSettings) btnSettings.style.display = 'flex';
+    if (btnBox) btnBox.style.display = 'flex';
+  } else if (role === 'seller') {
+    if (avatar) avatar.textContent = '🎟️';
+    if (name) name.textContent = sellerName;
+    if (roleText) roleText.textContent = 'Punto de Venta Taquilla';
+    if (btnSellers) btnSellers.style.display = 'none';
+    if (btnSettings) btnSettings.style.display = 'none';
+    if (btnBox) btnBox.style.display = 'flex';
+  } else if (role === 'gatekeeper') {
+    if (avatar) avatar.textContent = '🚪';
+    if (name) name.textContent = 'Personal de Puerta';
+    if (roleText) roleText.textContent = 'Control de Acceso Portería';
+    if (btnSellers) btnSellers.style.display = 'none';
+    if (btnSettings) btnSettings.style.display = 'none';
+    if (btnBox) btnBox.style.display = 'none';
+  }
+
+  updateSellersBadges();
+}
+
+// Global exposure for Sellers & Mobile Sheet
+window.openNewSellerModal = openNewSellerModal;
+window.closeNewSellerModal = closeNewSellerModal;
+window.openEditSellerPinModal = openEditSellerPinModal;
+window.closeEditSellerPinModal = closeEditSellerPinModal;
+window.deleteSeller = deleteSeller;
+window.togglePinVisibility = togglePinVisibility;
+window.openBottomSheet = openBottomSheet;
+window.closeBottomSheet = closeBottomSheet;
+
 
