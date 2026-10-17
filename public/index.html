@@ -2,9 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#090a10">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>EventPass - Gestión de Eventos & Control de Acceso Antifraude</title>
   <meta name="description" content="Sistema profesional de venta de entradas, emisión de boletos con QR único y validación en portería en tiempo real para evitar fraudes y accesos no autorizados.">
@@ -14,8 +15,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
   
-  <!-- CSS Principal (v3.0 Modern Enterprise Layout) -->
-  <link rel="stylesheet" href="css/style.css?v=3.0">
+  <!-- CSS Principal (v5.0 Native Mobile & Enterprise Suite con Fallback Flat) -->
+  <link rel="stylesheet" href="css/style.css?v=5.0" onerror="this.onerror=null;this.href='style.css?v=5.0';">
 </head>
 <body>
   <!-- Fondo Oscuro para Menú Lateral en Móviles -->
@@ -58,6 +59,11 @@
           <span class="tab-label">Asistentes</span>
           <span class="tab-badge" id="tabCount">0</span>
         </button>
+        <button class="tab-btn" data-tab="sellers" id="navSellersBtn">
+          <span class="tab-icon">👥</span>
+          <span class="tab-label">Vendedores</span>
+          <span class="tab-badge" id="sidebarSellersBadge">0</span>
+        </button>
 
         <div class="sidebar-section-label">OPERACIONES</div>
         <button class="tab-btn" data-tab="scanner" id="navScannerBtn">
@@ -90,11 +96,17 @@
       <!-- Topbar Compacta y Profesional -->
       <header class="app-topbar">
         <div class="topbar-left">
-          <button class="mobile-menu-trigger" id="mobileMenuBtn" type="button" aria-label="Abrir Menú">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          <button class="mobile-menu-trigger" id="mobileMenuBtn" type="button" aria-label="Abrir Menú de Opciones">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
           
-          <div class="topbar-breadcrumb">
+          <div class="mobile-app-brand" id="mobileBrandTitle">
+            <span class="mobile-brand-icon">🎟️</span>
+            <span class="mobile-brand-name">EventPass</span>
+            <span class="mobile-brand-tag" id="mobileCurrentTabTag">Dashboard</span>
+          </div>
+
+          <div class="topbar-breadcrumb desktop-only">
             <span class="crumb-brand">EventPass</span>
             <span class="crumb-separator">/</span>
             <span class="crumb-active" id="topbarCurrentViewTitle">Dashboard</span>
@@ -227,6 +239,28 @@
           </div>
           <div class="progress-track">
             <div class="progress-fill" id="aforoProgressFill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Ranking y Rendimiento de Ventas por Vendedor -->
+        <div class="sellers-dashboard-card" id="sellersDashboardSection" style="margin-top: 1.25rem;">
+          <div class="sellers-dashboard-header">
+            <div class="sellers-dashboard-title">
+              <span class="icon">🏆</span>
+              <div>
+                <h3>Ventas por Vendedor</h3>
+                <p>Desempeño y recaudación en tiempo real por cada taquilla / promotor</p>
+              </div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('sellers')" type="button">
+              <span>👥</span> Administrar Vendedores
+            </button>
+          </div>
+          <div class="sellers-ranking-list" id="dashboardSellersRanking">
+            <!-- Se llena dinámicamente con app.js -->
+            <div style="text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.88rem;">
+              Cargando estadísticas de vendedores...
+            </div>
           </div>
         </div>
 
@@ -726,7 +760,7 @@
             </div>
           </div>
 
-          <div class="table-wrapper">
+          <div class="table-wrapper desktop-table-wrap">
             <table>
               <thead>
                 <tr>
@@ -745,6 +779,14 @@
                 <!-- Se llena dinámicamente -->
               </tbody>
             </table>
+          </div>
+
+          <!-- Vista de Tarjetas Móviles Nativas (Amigable 100% para celulares sin scroll horizontal) -->
+          <div class="attendees-mobile-cards-stream" id="attendeesCardsStream">
+            <!-- Se llena dinámicamente con app.js -->
+            <div style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.88rem;">
+              Cargando asistentes...
+            </div>
           </div>
         </div>
       </section>
@@ -853,35 +895,299 @@
             </div>
           </form>
         </div>
+      <!-- ================= PESTAÑA 6: GESTIÓN DE VENDEDORES (ADMIN PRIVILEGE) ================= -->
+      <section id="tab-sellers" class="tab-content">
+        <div class="sellers-view-container">
+          <!-- Encabezado de la Sección -->
+          <div class="sellers-view-header">
+            <div class="sellers-view-title-group">
+              <div class="sellers-badge-pill">👑 PRIVILEGIO DE ADMINISTRADOR</div>
+              <h2 style="font-family: var(--font-heading); font-size: 1.45rem; margin-top: 0.35rem; color: #fff;">
+                Gestión de Vendedores & Promotores
+              </h2>
+              <p style="color: var(--text-secondary); font-size: 0.88rem; margin-top: 0.25rem;">
+                Crea cuentas de vendedores con su propio PIN de 4 cifras. El sistema registra y atribuye las ventas de boletos a su respectivo vendedor.
+              </p>
+            </div>
+            <div class="sellers-view-actions">
+              <button class="btn btn-primary" id="btnOpenNewSellerModal" type="button" style="font-weight: 700;">
+                <span>➕</span> Registrar Nuevo Vendedor
+              </button>
+              <button class="view-close-btn" onclick="switchTab('dashboard')" type="button" title="Volver al Dashboard">
+                ✕ Cerrar
+              </button>
+            </div>
+          </div>
+
+          <!-- Indicadores Clave de Vendedores -->
+          <div class="kpi-grid sellers-kpi-grid" style="margin-top: 1.25rem;">
+            <div class="kpi-card highlight">
+              <div class="kpi-header">
+                <span>Vendedores Registrados</span>
+                <div class="kpi-icon indigo">👥</div>
+              </div>
+              <div class="kpi-value" id="kpiSellersCount">0</div>
+              <div class="kpi-subtext">Cuentas activas con PIN</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Boletos por Vendedores</span>
+                <div class="kpi-icon green">🎟️</div>
+              </div>
+              <div class="kpi-value" id="kpiSellersTickets">0</div>
+              <div class="kpi-subtext">Entradas vendidas en taquilla</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Recaudación Vendedores</span>
+                <div class="kpi-icon green">💰</div>
+              </div>
+              <div class="kpi-value" id="kpiSellersRevenue">$0</div>
+              <div class="kpi-subtext">Total dinero recaudado</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Efectivo en Mano</span>
+                <div class="kpi-icon yellow">💵</div>
+              </div>
+              <div class="kpi-value" id="kpiSellersCash">$0</div>
+              <div class="kpi-subtext">A liquidar en cierre</div>
+            </div>
+          </div>
+
+          <!-- Cuadrícula de Tarjetas de Vendedores -->
+          <div class="sellers-cards-section" style="margin-top: 1.5rem;">
+            <div class="sellers-section-title-bar">
+              <h3 style="font-size: 1.15rem; font-family: var(--font-heading); color: #fff;">
+                Equipo de Ventas & Trazabilidad
+              </h3>
+              <span class="sellers-count-badge" id="sellersListCountTag">0 Vendedores</span>
+            </div>
+            
+            <div class="sellers-cards-grid" id="sellersCardsGrid">
+              <!-- Se llena dinámicamente con app.js -->
+              <div style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.9rem;">
+                Cargando vendedores...
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
     </main>
 
-    <!-- Barra de Navegación Inferior Ultracompacta para Móviles -->
-    <nav class="mobile-bottom-nav" id="mobileBottomNav">
-      <button class="mobile-nav-btn tab-btn active" data-tab="dashboard">
+    <!-- ================= BARRA DE NAVEGACIÓN MÓVIL NATIVA (APP DOCK INFERIOR) ================= -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Navegación Móvil Principal">
+      <button class="mobile-nav-btn tab-btn active" data-tab="dashboard" id="mobNavDashboard" type="button">
         <span class="mob-icon">📊</span>
-        <span class="mob-label">Panel</span>
+        <span class="mob-label">Dashboard</span>
       </button>
-      <button class="mobile-nav-btn tab-btn" data-tab="pos">
+      <button class="mobile-nav-btn tab-btn" data-tab="pos" id="mobNavPos" type="button">
         <span class="mob-icon">🛒</span>
-        <span class="mob-label">POS</span>
+        <span class="mob-label">Vender</span>
       </button>
-      <button class="mobile-nav-btn tab-btn" data-tab="scanner">
-        <span class="mob-icon">📷</span>
+      <button class="mobile-nav-btn tab-btn mob-scanner-cta" data-tab="scanner" id="mobNavScanner" type="button" aria-label="Abrir Escáner de Portería">
+        <div class="mob-scanner-bubble">
+          <span class="mob-scanner-icon">📷</span>
+        </div>
         <span class="mob-label">Escanear</span>
       </button>
-      <button class="mobile-nav-btn tab-btn" data-tab="attendees">
+      <button class="mobile-nav-btn tab-btn" data-tab="attendees" id="mobNavAttendees" type="button">
         <span class="mob-icon">👥</span>
-        <span class="mob-label">Asistentes</span>
+        <span class="mob-label">Boletos</span>
+        <span class="mob-badge" id="mobAttendeeBadge">0</span>
       </button>
-      <button class="mobile-nav-btn" id="mobileNavMoreBtn" type="button">
-        <span class="mob-icon">☰</span>
-        <span class="mob-label">Menú</span>
+      <button class="mobile-nav-btn" id="mobileNavMoreBtn" type="button" aria-label="Abrir Menú de Opciones">
+        <span class="mob-icon">⚙️</span>
+        <span class="mob-label">Más</span>
       </button>
     </nav>
   </div> <!-- /.app-main -->
 </div> <!-- /.app-layout -->
+
+  <!-- ================= BOTTOM SHEET MÓVIL (MENÚ DESLIZANTE NATIVO) ================= -->
+  <div class="bottom-sheet-backdrop" id="bottomSheetBackdrop"></div>
+  <div class="bottom-sheet" id="moreBottomSheet" role="dialog" aria-modal="true" aria-label="Menú y Opciones">
+    <div class="bottom-sheet-handle-bar">
+      <div class="bottom-sheet-pill"></div>
+    </div>
+    <div class="bottom-sheet-header">
+      <div class="bottom-sheet-title">
+        <span>📱 Opciones de la Aplicación</span>
+      </div>
+      <button class="bottom-sheet-close-btn" id="closeBottomSheetBtn" type="button" aria-label="Cerrar menú">✕</button>
+    </div>
+    <div class="bottom-sheet-content">
+      <!-- Info de usuario activo -->
+      <div class="sheet-user-pill">
+        <div class="sheet-user-avatar" id="sheetUserAvatar">👑</div>
+        <div class="sheet-user-info">
+          <span class="sheet-user-name" id="sheetUserName">Administrador</span>
+          <span class="sheet-user-role" id="sheetUserRole">Acceso Total</span>
+        </div>
+        <button class="btn btn-secondary btn-xs" id="sheetBtnSwitchUser" type="button">Cambiar</button>
+      </div>
+
+      <div class="sheet-menu-list">
+        <!-- Botón Vendedores (Visible para Administrador) -->
+        <button class="sheet-menu-item" id="sheetBtnSellers" type="button">
+          <div class="sheet-menu-icon purple">👥</div>
+          <div class="sheet-menu-text">
+            <strong>Gestión de Vendedores</strong>
+            <small>Crear vendedores, asignar PINs y ver ventas</small>
+          </div>
+          <span class="sheet-badge" id="sheetSellersCountBadge">0</span>
+          <span class="sheet-arrow">›</span>
+        </button>
+
+        <!-- Botón Mi Caja / Turno -->
+        <button class="sheet-menu-item" id="sheetBtnBox" type="button">
+          <div class="sheet-menu-icon green">💰</div>
+          <div class="sheet-menu-text">
+            <strong>Mi Caja / Corte de Turno</strong>
+            <small>Arqueo de efectivo en mano y comprobante</small>
+          </div>
+          <span class="sheet-arrow">›</span>
+        </button>
+
+        <!-- Botón Emisión en Lote -->
+        <button class="sheet-menu-item" id="sheetBtnSellBatch" type="button">
+          <div class="sheet-menu-icon blue">➕</div>
+          <div class="sheet-menu-text">
+            <strong>Emisión Múltiple</strong>
+            <small>Vender 2, 5 o 10 boletos de una sola vez</small>
+          </div>
+          <span class="sheet-arrow">›</span>
+        </button>
+
+        <!-- Botón Configuración del Evento (Admin) -->
+        <button class="sheet-menu-item" id="sheetBtnSettings" type="button">
+          <div class="sheet-menu-icon amber">⚙️</div>
+          <div class="sheet-menu-text">
+            <strong>Configuración del Evento</strong>
+            <small>Fecha, aforo, tipos de entrada y claves</small>
+          </div>
+          <span class="sheet-arrow">›</span>
+        </button>
+
+        <!-- Botón Exportar Excel -->
+        <a href="/api/export/csv" class="sheet-menu-item" download id="sheetBtnExport">
+          <div class="sheet-menu-icon emerald">📥</div>
+          <div class="sheet-menu-text">
+            <strong>Descargar Excel (CSV)</strong>
+            <small>Reporte completo con vendedor y estado</small>
+          </div>
+          <span class="sheet-arrow">›</span>
+        </a>
+
+        <!-- Botón Cambiar de Modo / Cerrar Sesión -->
+        <button class="sheet-menu-item danger" id="sheetBtnLogout" type="button">
+          <div class="sheet-menu-icon red">🔒</div>
+          <div class="sheet-menu-text">
+            <strong>Cambiar de Usuario / Salir</strong>
+            <small>Portería, Ventas o Administrador</small>
+          </div>
+          <span class="sheet-arrow">›</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL CREAR NUEVO VENDEDOR ================= -->
+  <div class="modal-backdrop" id="sellerCreateModal" role="dialog" aria-modal="true" aria-labelledby="sellerCreateModalTitle">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-top-bar">
+        <div class="modal-top-title">
+          <span>👥</span> Registrar Nuevo Vendedor
+        </div>
+        <button class="modal-close-pill-btn" id="sellerCreateModalCloseBtn" type="button" title="Cerrar ventana">
+          ✕ Cerrar
+        </button>
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <h2 id="sellerCreateModalTitle" style="font-family: var(--font-heading); font-size: 1.3rem; color: #fff;">
+          Crear Cuenta de Vendedor
+        </h2>
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">
+          Cada vendedor tendrá su propio PIN de 4 dígitos para ingresar al Punto de Venta y emitir boletos a su nombre.
+        </p>
+      </div>
+
+      <form id="formCreateSeller" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="form-group">
+          <label for="newSellerNameInput">Nombre Completo o Identificador de Taquilla *</label>
+          <input type="text" id="newSellerNameInput" required placeholder="Ej: Laura Gómez o Taquilla Norte 1" autocomplete="name">
+          <small style="color: var(--text-muted); font-size: 0.75rem;">Este nombre aparecerá en los boletos emitidos y en el reporte de ventas.</small>
+        </div>
+
+        <div class="form-group" style="text-align: center;">
+          <label for="newSellerPinInput">PIN de Acceso Exclusivo (4 cifras numéricas) *</label>
+          <div class="pin-input-container" style="margin-top: 0.35rem;">
+            <input type="password" id="newSellerPinInput" required maxlength="4" pattern="\d{4}" inputmode="numeric" placeholder="• • • •" autocomplete="off" style="font-size: 1.4rem; letter-spacing: 6px; text-align: center; max-width: 160px; margin: 0 auto;">
+          </div>
+          <small style="color: var(--text-muted); font-size: 0.75rem;">Código único de 4 cifras con el que el vendedor iniciará su turno.</small>
+          <div class="auth-error-msg" id="newSellerErrorMsg" style="margin-top: 0.35rem;"></div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+          <button type="button" class="btn btn-secondary" style="flex: 1;" id="btnCancelCreateSeller">
+            ✕ Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary" style="flex: 1.5; font-weight: 700;">
+            <span>💾</span> Guardar Vendedor
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL EDITAR PIN DE VENDEDOR ================= -->
+  <div class="modal-backdrop" id="sellerEditPinModal" role="dialog" aria-modal="true" aria-labelledby="sellerEditPinTitle">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-top-bar">
+        <div class="modal-top-title">
+          <span>🔑</span> Cambiar PIN
+        </div>
+        <button class="modal-close-pill-btn" id="sellerEditPinModalCloseBtn" type="button" title="Cerrar ventana">
+          ✕ Cerrar
+        </button>
+      </div>
+
+      <div style="margin-bottom: 1rem; text-align: center;">
+        <h2 id="sellerEditPinTitle" style="font-family: var(--font-heading); font-size: 1.25rem; color: #fff;">
+          Cambiar PIN de Vendedor
+        </h2>
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">
+          Vendedor: <strong id="editSellerTargetName" style="color: #38bdf8;">-</strong>
+        </p>
+      </div>
+
+      <form id="formEditSellerPin" style="display: flex; flex-direction: column; gap: 1rem;">
+        <input type="hidden" id="editSellerTargetId">
+
+        <div class="form-group" style="text-align: center;">
+          <label for="editSellerNewPinInput">Ingresa el Nuevo PIN de 4 Cifras *</label>
+          <div class="pin-input-container" style="margin-top: 0.35rem;">
+            <input type="password" id="editSellerNewPinInput" required maxlength="4" pattern="\d{4}" inputmode="numeric" placeholder="• • • •" autocomplete="off" style="font-size: 1.4rem; letter-spacing: 6px; text-align: center; max-width: 160px; margin: 0 auto;">
+          </div>
+          <div class="auth-error-msg" id="editSellerPinErrorMsg" style="margin-top: 0.35rem;"></div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+          <button type="button" class="btn btn-secondary" style="flex: 1;" id="btnCancelEditSellerPin">
+            ✕ Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary" style="flex: 1.5; font-weight: 700;">
+            <span>💾</span> Actualizar PIN
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- ================= MODAL DE BOLETO DIGITAL ================= -->
   <div class="modal-backdrop" id="ticketModal" role="dialog" aria-modal="true" aria-labelledby="modalEventName">
@@ -1405,7 +1711,7 @@
   <!-- Librería de Escaneo QR -->
   <script src="vendor/html5-qrcode.min.js"></script>
 
-  <!-- Lógica Principal (v3.0 Modern Enterprise Layout) -->
-  <script src="js/app.js?v=3.0"></script>
+  <!-- Lógica Principal (v5.0 Native Mobile & Enterprise Suite con Fallback Flat) -->
+  <script src="js/app.js?v=5.0" onerror="this.onerror=null;this.src='app.js?v=5.0';"></script>
 </body>
 </html>
